@@ -1,6 +1,8 @@
 using UnityEngine;
 using MixedReality.Toolkit.Input;
+using UnityEngine.Assertions;
 using TMPro;
+using System;
 
 public class GazeTracker : MonoBehaviour
 {
@@ -36,12 +38,26 @@ public class GazeTracker : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
-        // check if gaze hit image
-        Vector3 hitPoint;
-        if (gazeInteractor.TryGetHitInfo(out hitPoint, out _, out _, out _))
+        if (gazeInteractor.TryGetCurrentRaycast(out RaycastHit? hitInfo, out _, out _, out _, out _) && hitInfo.HasValue)
         {
-            go.transform.position = hitPoint;
-            debugText.text = $"Hit Point: {hitPoint}";
+            GameObject hitGO = hitInfo.Value.collider.gameObject;
+            Vector3 hitPoint = hitInfo.Value.point;
+            RectTransform hitRect = hitGO.GetComponent<RectTransform>();
+            Assert.IsNotNull(hitRect, "Hit GameObject does not have a RectTransform component.");
+
+            // calculate world position of hitGO
+            Vector3 hitGOWorldPosition = hitGO.transform.position + hitGO.transform.parent.position;
+
+            Vector2 uvPoint = new Vector2(
+                Math.Abs(hitPoint.x - hitGOWorldPosition.x) / hitRect.rect.width,
+                Math.Abs(hitPoint.y - hitGOWorldPosition.y) / hitRect.rect.height
+            );
+            debugText.text = $"Object: {hitGO.name}, 3D Position: {hitPoint}, UV Coordinates: {uvPoint}";
         }
+        else
+        {
+            debugText.text = "No hit detected.";
+        }
+
     }
 }
