@@ -31,7 +31,7 @@ public class HoloLensZmqClient : MonoBehaviour
     private bool   imageThreadRunning = false;
 
     public RawImage displayImage;          // assign in Inspector
-    private Texture2D incomingTexture;
+    private Texture2D IncomingTexture { get; }
 
     // ---- NEW: flag to indicate a fresh image arrived ----
     private volatile bool newImageAvailable = false;
@@ -102,7 +102,7 @@ public class HoloLensZmqClient : MonoBehaviour
         imageSubscriber.SubscribeToAnyTopic();
         Debug.Log($"[HL2][ZMQ] SUBscribed to images at {imageConnectStr}");
 
-        incomingTexture = new Texture2D(2, 2, TextureFormat.RGB24, false);
+        IncomingTexture = new Texture2D(2, 2, TextureFormat.RGB24, false);
 
         imageThreadRunning = true;
         imageThread = new Thread(ImageReceiveLoop);
@@ -137,7 +137,7 @@ public class HoloLensZmqClient : MonoBehaviour
                     // Frame 1 is the JPEG payload
                     var jpgBytes = msg[1].ToByteArray();
 
-                    bool updated = incomingTexture.LoadImage(jpgBytes);
+                    bool updated = IncomingTexture.LoadImage(jpgBytes);
                     if (updated)
                     {
                         // Mark that a fresh image has arrived:
@@ -194,20 +194,20 @@ public class HoloLensZmqClient : MonoBehaviour
     // Example placeholder for eye-tracking → texture‐space coords:
     private Vector2 GetGazePointOnTexture()
     {
-        if (incomingTexture != null)
+        if (IncomingTexture != null)
         {
-            return new Vector2(incomingTexture.width / 2f, incomingTexture.height / 2f);
+            return new Vector2(IncomingTexture.width / 2f, IncomingTexture.height / 2f);
         }
         return Vector2.zero;
     }
 
     void Update()
     {
-        if (incomingTexture != null && displayImage != null)
+        if (IncomingTexture != null && displayImage != null)
         {
             lock (textureLock)
             {
-                displayImage.texture = incomingTexture;
+                displayImage.texture = IncomingTexture;
                 displayImage.SetNativeSize();
             }
         }

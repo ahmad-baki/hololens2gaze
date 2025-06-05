@@ -43,16 +43,19 @@ public class GazeTracker : MonoBehaviour
             GameObject hitGO = hitInfo.Value.collider.gameObject;
             Vector3 hitPoint = hitInfo.Value.point;
             RectTransform hitRect = hitGO.GetComponent<RectTransform>();
+            
             Assert.IsNotNull(hitRect, "Hit GameObject does not have a RectTransform component.");
+            // assumes that pivot is at the center of the RectTransform
+            // (0, 0) is the bottom-left corner, (1, 1) is the top-right corner
 
-            // calculate world position of hitGO
-            Vector3 hitGOWorldPosition = hitGO.transform.position + hitGO.transform.parent.position;
-
+            Vector3 canvasPos = hitGO.transform.parent.position;
             Vector2 uvPoint = new Vector2(
-                Math.Abs(hitPoint.x - hitGOWorldPosition.x) / hitRect.rect.width,
-                Math.Abs(hitPoint.y - hitGOWorldPosition.y) / hitRect.rect.height
+                (hitPoint.x - canvasPos.x - hitRect.offsetMin.x) / hitRect.rect.width,
+                (hitPoint.y - canvasPos.y - hitRect.offsetMin.y) / hitRect.rect.height
             );
             debugText.text = $"Object: {hitGO.name}, 3D Position: {hitPoint}, UV Coordinates: {uvPoint}";
+            Debug.Log($"UV Coordinates: {uvPoint}, offset: {hitRect.offsetMin}, {hitRect.offsetMax}");
+            go.transform.position = hitPoint;
         }
         else
         {
