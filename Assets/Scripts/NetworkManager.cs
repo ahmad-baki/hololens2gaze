@@ -58,7 +58,7 @@ public class NetworkManager : MonoBehaviour
     
     void Start()
     {
-        
+
         StartCoroutine(DiscoverPCCoroutine());
     }
 
@@ -174,28 +174,28 @@ public class NetworkManager : MonoBehaviour
     {
         while (imageThreadRunning)
         {
-            try
-            {
-                byte[] msg = imagePullSocket.ReceiveFrameBytes();
+            // try
+            // {
+                // Receive multi-frame message
+                var msg = imagePullSocket.ReceiveMultipartMessage();
+                if (msg == null || msg.FrameCount != 2)
+                {
+                    Debug.LogWarning("[HL2][ZMQ] Received invalid message, waiting for next frame...");
+                    continue; // Invalid message, continue to next iteration
+                }
 
-                if (msg == null || msg.Length == 0)
-                {
-                    Debug.LogWarning("[HL2][ZMQ] Received empty message, waiting for next frame...");
-                    continue; // No message received, continue to next iteration
-                }
-                Debug.Log("[HL2][ZMQ] Received image frame with " + msg.Length + " bytes.");
-                lock (textureLock)
-                {
-                    newImageBytes = msg;
-                    newImageAvailable = true;
-                }
-            }
-            catch (Exception ex)
-            {
-                Debug.LogError("[HL2][ZMQ] ImageReceiveLoop exception: " + ex.Message);
-                debugText.text = "[HL2][ZMQ] ImageReceiveLoop exception: " + ex.Message;
-                break;
-            }
+                currentStep = msg[0].ConvertToInt32();
+                byte[] imageBytes = msg[1].Buffer;
+                Debug.Log("[HL2][ZMQ] Received image frame with " + imageBytes.Length + " bytes. Step: " + currentStep);
+                newImageBytes = imageBytes;
+                newImageAvailable = true;
+            // }
+            // catch (Exception ex)
+            // {
+            //     Debug.LogError("[HL2][ZMQ] ImageReceiveLoop exception: " + ex.Message);
+            //     debugText.text = "[HL2][ZMQ] ImageReceiveLoop exception: " + ex.Message;
+            //     break;
+            // }
         }
     }
 
@@ -210,7 +210,6 @@ public class NetworkManager : MonoBehaviour
             step = currentStep
         };
         string gazeJson = JsonUtility.ToJson(gazeObj);
-
         try
         {
             gazePushSocket.SendFrame(gazeJson);

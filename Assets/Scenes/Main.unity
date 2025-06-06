@@ -944,7 +944,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   debugText: {fileID: 1978683865}
-  displayImage: {fileID: 586722503}
+  gazeTracker: {fileID: 1064097220}
 --- !u!4 &1886020958
 Transform:
   m_ObjectHideFlags: 0
