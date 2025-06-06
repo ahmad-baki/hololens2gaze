@@ -11,10 +11,12 @@ using NetMQ;
 using NetMQ.Sockets;
 using TMPro;
 using System.Collections.Generic;
+using System.Net.NetworkInformation;
+using System.Linq;
 
 public class NetworkManager : MonoBehaviour
 {
-    
+
     [SerializeField]
     private TMP_Text debugText;
 
@@ -25,21 +27,21 @@ public class NetworkManager : MonoBehaviour
 
     // --- UDP discovery parameters (unchanged) ---
     private const int DISCOVERY_PORT = 5005;
-    private const string DISCOVER_MESSAGE  = "DISCOVER_PC";
-    private const string DISCOVERY_REPLY   = "PC_HERE";
-    private const int    UDP_TIMEOUT_MS    = 50000;
+    private const string DISCOVER_MESSAGE = "DISCOVER_PC";
+    private const string DISCOVERY_REPLY = "PC_HERE";
+    private const int UDP_TIMEOUT_MS = 50000;
 
     private string pcIpAddress = null;
 
     // --- ZMQ endpoints (unchanged) ---
-    private const int    ZMQ_IMAGE_PORT = 5006;  
-    private const int    ZMQ_GAZE_PORT  = 5007;  
+    private const int ZMQ_IMAGE_PORT = 5006;
+    private const int ZMQ_GAZE_PORT = 5007;
 
     private SubscriberSocket imageSubscriber;
-    private PublisherSocket  gazePublisher;
+    private PublisherSocket gazePublisher;
 
     private Thread imageThread;
-    private bool   imageThreadRunning = false;
+    private bool imageThreadRunning = false;
     private Texture2D texture;
     private byte[] newImageBytes;
 
@@ -56,7 +58,7 @@ public class NetworkManager : MonoBehaviour
         get => texture;
 
     }
-    
+
     void Start()
     {
 
@@ -79,13 +81,15 @@ public class NetworkManager : MonoBehaviour
         udpClient.EnableBroadcast = true;
         udpClient.Client.ReceiveTimeout = UDP_TIMEOUT_MS;
 
-        // IPEndPoint broadcastEP = new IPEndPoint(IPAddress.Broadcast, DISCOVERY_PORT);
-        IPEndPoint broadcastEP = new IPEndPoint(IPAddress.Parse("192.168.0.208"), DISCOVERY_PORT);
+        // Get the broadcast address for the local network
+
+        IPAddress broadcastAddress = GetWLANBroadcastAddress();
+        IPEndPoint broadcastEP = new IPEndPoint(broadcastAddress, DISCOVERY_PORT);
         byte[] discoverBytes = Encoding.UTF8.GetBytes(DISCOVER_MESSAGE);
         IPEndPoint remoteEP = new IPEndPoint(IPAddress.Any, 0);
         DateTime startTime = DateTime.UtcNow;
 
-        while ((DateTime.UtcNow - startTime).TotalMilliseconds < UDP_TIMEOUT_MS) 
+        while ((DateTime.UtcNow - startTime).TotalMilliseconds < UDP_TIMEOUT_MS)
         {
             udpClient.SendAsync(discoverBytes, discoverBytes.Length, broadcastEP);
             Debug.Log("[HL2][UDP] Sent DISCOVER_PC broadcast to " + broadcastEP.Address);
@@ -94,7 +98,7 @@ public class NetworkManager : MonoBehaviour
             try
             {
                 // If no data available, skip this iteration, necessary because Receive will block if no data is available
-                if (udpClient.Available == 0) continue; 
+                if (udpClient.Available == 0) continue;
 
                 byte[] data = udpClient.Receive(ref remoteEP);
                 string text = Encoding.UTF8.GetString(data);
@@ -125,21 +129,11 @@ public class NetworkManager : MonoBehaviour
         StartZmqSockets();
     }
 
+
     void StartZmqSockets()
     {
         AsyncIO.ForceDotNet.Force();
         NetMQConfig.Cleanup();
-
-        // --- Start image SUB ---
-        // imageSubscriber = new SubscriberSocket();
-        // string imageConnectStr = $"tcp://{pcIpAddress}:{ZMQ_IMAGE_PORT}";
-        // imageSubscriber.Options.ReceiveHighWatermark = 1;
-        // imageSubscriber.Connect(imageConnectStr);
-        // imageSubscriber.SubscribeToAnyTopic();
-
-
-        // Debug.Log($"[HL2][ZMQ] SUBscribed to images at {address}");
-        // debugText.text = $"[HL2][ZMQ] SUBscribed to images at {address}";
 
         imagePullSocket = new PullSocket();
         string address = $"tcp://{pcIpAddress}:{ZMQ_IMAGE_PORT}";
@@ -160,23 +154,14 @@ public class NetworkManager : MonoBehaviour
         gazePushSocket.Connect(gazeAddress);
         Debug.Log($"[HL2][ZMQ] Connected to gaze publisher at {gazeAddress}");
         debugText.text = $"[HL2][ZMQ] Connected to gaze publisher at {gazeAddress}";
-        
-
-        // // --- Start gaze PUB ---
-        // gazePublisher = new PublisherSocket();
-        // string gazeConnectStr = $"tcp://{pcIpAddress}:{ZMQ_GAZE_PORT}";
-        // gazePublisher.Options.SendHighWatermark = 1;
-        // gazePublisher.Connect(gazeConnectStr);
-        // Debug.Log($"[HL2][ZMQ] Publishing gaze to {gazeConnectStr}");
-        // debugText.text = $"[HL2][ZMQ] Publishing gaze to {gazeConnectStr}";
     }
 
     void ImageReceiveLoop()
     {
         while (imageThreadRunning)
         {
-            // try
-            // {
+            try
+            {
                 // Receive multi-frame message
                 var msg = imagePullSocket.ReceiveMultipartMessage();
                 if (msg == null || msg.FrameCount != 2)
@@ -190,13 +175,13 @@ public class NetworkManager : MonoBehaviour
                 Debug.Log("[HL2][ZMQ] Received image frame with " + imageBytes.Length + " bytes. Step: " + currentStep);
                 newImageBytes = imageBytes;
                 newImageAvailable = true;
-            // }
-            // catch (Exception ex)
-            // {
-            //     Debug.LogError("[HL2][ZMQ] ImageReceiveLoop exception: " + ex.Message);
-            //     debugText.text = "[HL2][ZMQ] ImageReceiveLoop exception: " + ex.Message;
-            //     break;
-            // }
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError("[HL2][ZMQ] ImageReceiveLoop exception: " + ex.Message);
+                debugText.text = "[HL2][ZMQ] ImageReceiveLoop exception: " + ex.Message;
+                break;
+            }
         }
     }
 
@@ -231,5 +216,24 @@ public class NetworkManager : MonoBehaviour
         imageSubscriber?.Close();
         gazePublisher?.Close();
         NetMQConfig.Cleanup();
+    }
+
+    private IPAddress GetWLANBroadcastAddress()
+    {
+        
+    }
+
+        public static IPAddress GetBroadcastAddress(UnicastIPAddressInformation unicastAddress)
+    {
+        return GetBroadcastAddress(unicastAddress.Address, unicastAddress.IPv4Mask);
+    }
+
+    public static IPAddress GetBroadcastAddress(IPAddress address, IPAddress mask)
+    {
+        uint ipAddress = BitConverter.ToUInt32(address.GetAddressBytes(), 0);
+        uint ipMaskV4 = BitConverter.ToUInt32(mask.GetAddressBytes(), 0);
+        uint broadCastIpAddress = ipAddress | ~ipMaskV4;
+
+        return new IPAddress(BitConverter.GetBytes(broadCastIpAddress));
     }
 }
