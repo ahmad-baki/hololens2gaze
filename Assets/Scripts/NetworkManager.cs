@@ -11,11 +11,13 @@ using NetMQ;
 using NetMQ.Sockets;
 using TMPro;
 
-public class HoloLensZmqClient : MonoBehaviour
+public class NetworkManager : MonoBehaviour
 {
     
     [SerializeField]
     private TMP_Text debugText;
+    public static event Action OnImageReady;
+
 
     // --- UDP discovery parameters (unchanged) ---
     private const int DISCOVERY_PORT = 5005;
@@ -36,7 +38,7 @@ public class HoloLensZmqClient : MonoBehaviour
     private bool   imageThreadRunning = false;
 
     public RawImage displayImage;          // assign in Inspector
-    private Texture2D IncomingTexture { get; set; } // will hold the incoming image
+    private Texture2D incomingTexture;
 
     // ---- NEW: flag to indicate a fresh image arrived ----
     private volatile bool newImageAvailable = false;
@@ -46,6 +48,12 @@ public class HoloLensZmqClient : MonoBehaviour
     void Start()
     {
         StartCoroutine(DiscoverPCCoroutine());
+    }
+
+    public Texture2D IncomingTexture
+    {
+        get => incomingTexture;
+
     }
 
     IEnumerator DiscoverPCCoroutine()
@@ -113,7 +121,7 @@ public class HoloLensZmqClient : MonoBehaviour
         Debug.Log($"[HL2][ZMQ] SUBscribed to images at {imageConnectStr}");
         debugText.text = $"[HL2][ZMQ] SUBscribed to images at {imageConnectStr}";
 
-        IncomingTexture = new Texture2D(2, 2, TextureFormat.RGB24, false);
+        incomingTexture = new Texture2D(2, 2, TextureFormat.RGB24, false);
 
         imageThreadRunning = true;
         imageThread = new Thread(ImageReceiveLoop);
@@ -216,17 +224,6 @@ public class HoloLensZmqClient : MonoBehaviour
         return Vector2.zero;
     }
 
-    void Update()
-    {
-        if (IncomingTexture != null && displayImage != null)
-        {
-            lock (textureLock)
-            {
-                displayImage.texture = IncomingTexture;
-                displayImage.SetNativeSize();
-            }
-        }
-    }
 
     private void OnDestroy()
     {
