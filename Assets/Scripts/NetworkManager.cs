@@ -10,10 +10,13 @@ using UnityEngine.UI;
 using NetMQ;
 using NetMQ.Sockets;
 
-public class HoloLensZmqClient : MonoBehaviour
+public class NetworkManager : MonoBehaviour
 {
+    public static event Action OnImageReady;
+
+
     // --- UDP discovery parameters (unchanged) ---
-    private const int    DISCOVERY_PORT    = 5005;
+    private const int DISCOVERY_PORT = 5005;
     private const string DISCOVER_MESSAGE  = "DISCOVER_PC";
     private const string DISCOVERY_REPLY   = "PC_HERE";
     private const int    UDP_TIMEOUT_MS    = 5000;
@@ -30,8 +33,7 @@ public class HoloLensZmqClient : MonoBehaviour
     private Thread imageThread;
     private bool   imageThreadRunning = false;
 
-    public RawImage displayImage;          // assign in Inspector
-    private Texture2D IncomingTexture { get; }
+    private Texture2D incomingTexture ;
 
     // ---- NEW: flag to indicate a fresh image arrived ----
     private volatile bool newImageAvailable = false;
@@ -41,6 +43,12 @@ public class HoloLensZmqClient : MonoBehaviour
     void Start()
     {
         StartCoroutine(DiscoverPCCoroutine());
+    }
+
+    public Texture2D IncomingTexture
+    {
+        get => incomingTexture;
+
     }
 
     IEnumerator DiscoverPCCoroutine()
@@ -102,7 +110,7 @@ public class HoloLensZmqClient : MonoBehaviour
         imageSubscriber.SubscribeToAnyTopic();
         Debug.Log($"[HL2][ZMQ] SUBscribed to images at {imageConnectStr}");
 
-        IncomingTexture = new Texture2D(2, 2, TextureFormat.RGB24, false);
+        incomingTexture = new Texture2D(2, 2, TextureFormat.RGB24, false);
 
         imageThreadRunning = true;
         imageThread = new Thread(ImageReceiveLoop);
@@ -201,17 +209,6 @@ public class HoloLensZmqClient : MonoBehaviour
         return Vector2.zero;
     }
 
-    void Update()
-    {
-        if (IncomingTexture != null && displayImage != null)
-        {
-            lock (textureLock)
-            {
-                displayImage.texture = IncomingTexture;
-                displayImage.SetNativeSize();
-            }
-        }
-    }
 
     private void OnDestroy()
     {
