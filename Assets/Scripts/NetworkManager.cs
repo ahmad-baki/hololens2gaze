@@ -16,7 +16,10 @@ public class NetworkManager : MonoBehaviour
     
     [SerializeField]
     private TMP_Text debugText;
-    public static event Action OnImageReady;
+
+    [SerializeField]
+    private GazeTracker gazeTracker;
+    public static event Action OnImageReady = delegate { };
 
 
     // --- UDP discovery parameters (unchanged) ---
@@ -28,32 +31,45 @@ public class NetworkManager : MonoBehaviour
     private string pcIpAddress = null;
 
     // --- ZMQ endpoints (unchanged) ---
-    private const int    ZMQ_IMAGE_PORT = 5556;  
-    private const int    ZMQ_GAZE_PORT  = 5557;  
+    private const int    ZMQ_IMAGE_PORT = 5006;  
+    private const int    ZMQ_GAZE_PORT  = 5007;  
 
     private SubscriberSocket imageSubscriber;
     private PublisherSocket  gazePublisher;
 
     private Thread imageThread;
     private bool   imageThreadRunning = false;
-
-    public RawImage displayImage;          // assign in Inspector
-    private Texture2D incomingTexture;
+    private Texture2D texture;
+    private byte[] newImageBytes;
 
     // ---- NEW: flag to indicate a fresh image arrived ----
     private volatile bool newImageAvailable = false;
-    private int currentStep;
+    private int currentStep = -1;
+    private PullSocket imagePullSocket;
+    private PushSocket gazePushSocket;
     private readonly object textureLock = new object();
 
-    void Start()
-    {
-        StartCoroutine(DiscoverPCCoroutine());
-    }
 
     public Texture2D IncomingTexture
     {
-        get => incomingTexture;
+        get => texture;
 
+    }
+    
+    void Start()
+    {
+        
+        StartCoroutine(DiscoverPCCoroutine());
+    }
+
+    void Update()
+    {
+        if (newImageAvailable)
+        {
+            texture.LoadImage(newImageBytes);
+            GazePublish();
+            newImageAvailable = false;
+        }
     }
 
     IEnumerator DiscoverPCCoroutine()
@@ -62,7 +78,8 @@ public class NetworkManager : MonoBehaviour
         udpClient.EnableBroadcast = true;
         udpClient.Client.ReceiveTimeout = UDP_TIMEOUT_MS;
 
-        IPEndPoint broadcastEP = new IPEndPoint(IPAddress.Broadcast, DISCOVERY_PORT);
+        // IPEndPoint broadcastEP = new IPEndPoint(IPAddress.Broadcast, DISCOVERY_PORT);
+        IPEndPoint broadcastEP = new IPEndPoint(IPAddress.Parse("192.168.0.208"), DISCOVERY_PORT);
         byte[] discoverBytes = Encoding.UTF8.GetBytes(DISCOVER_MESSAGE);
         IPEndPoint remoteEP = new IPEndPoint(IPAddress.Any, 0);
         DateTime startTime = DateTime.UtcNow;
@@ -113,31 +130,44 @@ public class NetworkManager : MonoBehaviour
         NetMQConfig.Cleanup();
 
         // --- Start image SUB ---
-        imageSubscriber = new SubscriberSocket();
-        string imageConnectStr = $"tcp://{pcIpAddress}:{ZMQ_IMAGE_PORT}";
-        imageSubscriber.Options.ReceiveHighWatermark = 1;
-        imageSubscriber.Connect(imageConnectStr);
-        imageSubscriber.SubscribeToAnyTopic();
-        Debug.Log($"[HL2][ZMQ] SUBscribed to images at {imageConnectStr}");
-        debugText.text = $"[HL2][ZMQ] SUBscribed to images at {imageConnectStr}";
+        // imageSubscriber = new SubscriberSocket();
+        // string imageConnectStr = $"tcp://{pcIpAddress}:{ZMQ_IMAGE_PORT}";
+        // imageSubscriber.Options.ReceiveHighWatermark = 1;
+        // imageSubscriber.Connect(imageConnectStr);
+        // imageSubscriber.SubscribeToAnyTopic();
 
-        incomingTexture = new Texture2D(2, 2, TextureFormat.RGB24, false);
+
+        // Debug.Log($"[HL2][ZMQ] SUBscribed to images at {address}");
+        // debugText.text = $"[HL2][ZMQ] SUBscribed to images at {address}";
+
+        imagePullSocket = new PullSocket();
+        string address = $"tcp://{pcIpAddress}:{ZMQ_IMAGE_PORT}";
+        imagePullSocket.Connect(address);
+        Debug.Log($"[HL2][ZMQ] Connected to image publisher at {address}");
+
+        texture = new Texture2D(2, 2, TextureFormat.RGB24, false);
+        OnImageReady?.Invoke();
 
         imageThreadRunning = true;
         imageThread = new Thread(ImageReceiveLoop);
         imageThread.IsBackground = true;
         imageThread.Start();
 
-        // --- Start gaze PUB ---
-        gazePublisher = new PublisherSocket();
-        string gazeConnectStr = $"tcp://{pcIpAddress}:{ZMQ_GAZE_PORT}";
-        gazePublisher.Options.SendHighWatermark = 1;
-        gazePublisher.Connect(gazeConnectStr);
-        Debug.Log($"[HL2][ZMQ] PUBlishing gaze to {gazeConnectStr}");
-        debugText.text = $"[HL2][ZMQ] PUBlishing gaze to {gazeConnectStr}";
 
-        // 2c) Begin the coroutine that waits for newImageAvailable
-        StartCoroutine(GazePublishCoroutine());
+        gazePushSocket = new PushSocket();
+        string gazeAddress = $"tcp://{pcIpAddress}:{ZMQ_GAZE_PORT}";
+        gazePushSocket.Connect(gazeAddress);
+        Debug.Log($"[HL2][ZMQ] Connected to gaze publisher at {gazeAddress}");
+        debugText.text = $"[HL2][ZMQ] Connected to gaze publisher at {gazeAddress}";
+        
+
+        // // --- Start gaze PUB ---
+        // gazePublisher = new PublisherSocket();
+        // string gazeConnectStr = $"tcp://{pcIpAddress}:{ZMQ_GAZE_PORT}";
+        // gazePublisher.Options.SendHighWatermark = 1;
+        // gazePublisher.Connect(gazeConnectStr);
+        // Debug.Log($"[HL2][ZMQ] Publishing gaze to {gazeConnectStr}");
+        // debugText.text = $"[HL2][ZMQ] Publishing gaze to {gazeConnectStr}";
     }
 
     void ImageReceiveLoop()
@@ -146,28 +176,18 @@ public class NetworkManager : MonoBehaviour
         {
             try
             {
-                var msg = imageSubscriber.ReceiveMultipartMessage();
+                byte[] msg = imagePullSocket.ReceiveFrameBytes();
 
+                if (msg == null || msg.Length == 0)
+                {
+                    Debug.LogWarning("[HL2][ZMQ] Received empty message, waiting for next frame...");
+                    continue; // No message received, continue to next iteration
+                }
+                Debug.Log("[HL2][ZMQ] Received image frame with " + msg.Length + " bytes.");
                 lock (textureLock)
                 {
-                    var headerFrame = msg[0].Buffer;
-                    if (headerFrame.Length < 1) continue;
-                    currentStep = headerFrame[0];
-
-                    // Frame 1 is the JPEG payload
-                    var jpgBytes = msg[1].ToByteArray();
-
-                    bool updated = IncomingTexture.LoadImage(jpgBytes);
-                    if (updated)
-                    {
-                        // Mark that a fresh image has arrived:
-                        newImageAvailable = true;
-                    }
-                    else
-                    {
-                        Debug.LogWarning("[HL2][ZMQ] Failed to decode JPEG.");
-                        debugText.text = "[HL2][ZMQ] Failed to decode JPEG.";
-                    }
+                    newImageBytes = msg;
+                    newImageAvailable = true;
                 }
             }
             catch (Exception ex)
@@ -179,51 +199,30 @@ public class NetworkManager : MonoBehaviour
         }
     }
 
-    IEnumerator GazePublishCoroutine()
+    void GazePublish()
     {
-        while (true)
+        // At this point, a new frame has arrived. Send gaze only once per frame:
+        Vector2 gazeXY = gazeTracker.GetGazePointOnTexture();
+        var gazeObj = new
         {
-            // Wait until ImageReceiveLoop sets newImageAvailable = true
-            yield return new WaitUntil(() => newImageAvailable);
+            x = (int)gazeXY.x,
+            y = (int)gazeXY.y,
+            step = currentStep
+        };
+        string gazeJson = JsonUtility.ToJson(gazeObj);
 
-            // At this point, a new frame has arrived. Send gaze only once per frame:
-            Vector2 gazeXY = GetGazePointOnTexture();
-            var gazeObj = new
-            {
-                x         = (int)gazeXY.x,
-                y         = (int)gazeXY.y,
-                step = currentStep
-            };
-            string gazeJson = JsonUtility.ToJson(gazeObj);
-
-            try
-            {
-                gazePublisher.SendFrame(gazeJson);
-            }
-            catch (Exception ex)
-            {
-                Debug.LogError("[HL2][ZMQ] Failed to publish gaze: " + ex.Message);
-                debugText.text = "[HL2][ZMQ] Failed to publish gaze: " + ex.Message;
-            }
-
-            // Reset the flag so we wait for the next image:
-            newImageAvailable = false;
-
-            // Immediately loop back and wait for the next image.
-            // (You can insert a tiny delay here if needed, e.g. yield return null;)
-        }
-    }
-
-    // Example placeholder for eye-tracking → texture‐space coords:
-    private Vector2 GetGazePointOnTexture()
-    {
-        if (IncomingTexture != null)
+        try
         {
-            return new Vector2(IncomingTexture.width / 2f, IncomingTexture.height / 2f);
+            gazePushSocket.SendFrame(gazeJson);
         }
-        return Vector2.zero;
+        catch (Exception ex)
+        {
+            Debug.LogError("[HL2][ZMQ] Failed to publish gaze: " + ex.Message);
+            debugText.text = "[HL2][ZMQ] Failed to publish gaze: " + ex.Message;
+        }
+        Debug.Log($"[HL2][ZMQ] Published gaze at ({gazeXY.x}, {gazeXY.y}) for step {currentStep}");
+        debugText.text = $"[HL2][ZMQ] Published gaze at ({gazeXY.x}, {gazeXY.y}) for step {currentStep}";
     }
-
 
     private void OnDestroy()
     {
