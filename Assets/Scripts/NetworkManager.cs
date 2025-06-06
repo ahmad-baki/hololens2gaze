@@ -10,6 +10,7 @@ using UnityEngine.UI;
 using NetMQ;
 using NetMQ.Sockets;
 using TMPro;
+using System.Collections.Generic;
 
 public class NetworkManager : MonoBehaviour
 {
@@ -203,13 +204,9 @@ public class NetworkManager : MonoBehaviour
     {
         // At this point, a new frame has arrived. Send gaze only once per frame:
         Vector2 gazeXY = gazeTracker.GetGazePointOnTexture();
-        var gazeObj = new
-        {
-            x = (int)gazeXY.x,
-            y = (int)gazeXY.y,
-            step = currentStep
-        };
-        string gazeJson = JsonUtility.ToJson(gazeObj);
+        string gazeJson = $"{{\"x\": {gazeXY.x}, \"y\": {gazeXY.y}, \"step\": {currentStep}}}";
+        Debug.Log($"[HL2][ZMQ] Publishing gaze: {gazeJson}");
+
         try
         {
             gazePushSocket.SendFrame(gazeJson);
