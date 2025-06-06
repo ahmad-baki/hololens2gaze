@@ -9,14 +9,19 @@ using UnityEngine;
 using UnityEngine.UI;
 using NetMQ;
 using NetMQ.Sockets;
+using TMPro;
 
 public class HoloLensZmqClient : MonoBehaviour
 {
+    
+    [SerializeField]
+    private TMP_Text debugText;
+
     // --- UDP discovery parameters (unchanged) ---
-    private const int    DISCOVERY_PORT    = 5005;
+    private const int DISCOVERY_PORT = 5005;
     private const string DISCOVER_MESSAGE  = "DISCOVER_PC";
     private const string DISCOVERY_REPLY   = "PC_HERE";
-    private const int    UDP_TIMEOUT_MS    = 5000;
+    private const int    UDP_TIMEOUT_MS    = 50000;
 
     private string pcIpAddress = null;
 
@@ -31,7 +36,7 @@ public class HoloLensZmqClient : MonoBehaviour
     private bool   imageThreadRunning = false;
 
     public RawImage displayImage;          // assign in Inspector
-    private Texture2D IncomingTexture { get; }
+    private Texture2D IncomingTexture { get; set; } // will hold the incoming image
 
     // ---- NEW: flag to indicate a fresh image arrived ----
     private volatile bool newImageAvailable = false;
@@ -51,23 +56,27 @@ public class HoloLensZmqClient : MonoBehaviour
 
         IPEndPoint broadcastEP = new IPEndPoint(IPAddress.Broadcast, DISCOVERY_PORT);
         byte[] discoverBytes = Encoding.UTF8.GetBytes(DISCOVER_MESSAGE);
-
-        udpClient.Send(discoverBytes, discoverBytes.Length, broadcastEP);
-        Debug.Log("[HL2][UDP] Sent DISCOVER_PC broadcast.");
-
         IPEndPoint remoteEP = new IPEndPoint(IPAddress.Any, 0);
         DateTime startTime = DateTime.UtcNow;
 
-        while ((DateTime.UtcNow - startTime).TotalMilliseconds < UDP_TIMEOUT_MS)
+        while ((DateTime.UtcNow - startTime).TotalMilliseconds < UDP_TIMEOUT_MS) 
         {
+            udpClient.SendAsync(discoverBytes, discoverBytes.Length, broadcastEP);
+            Debug.Log("[HL2][UDP] Sent DISCOVER_PC broadcast to " + broadcastEP.Address);
+            debugText.text = "[HL2][UDP] Sent DISCOVER_PC broadcast to " + broadcastEP.Address;
+            yield return new WaitForSeconds(0.1f); // Small delay to avoid flooding
             try
             {
+                // If no data available, skip this iteration, necessary because Receive will block if no data is available
+                if (udpClient.Available == 0) continue; 
+
                 byte[] data = udpClient.Receive(ref remoteEP);
                 string text = Encoding.UTF8.GetString(data);
                 if (text == DISCOVERY_REPLY)
                 {
                     pcIpAddress = remoteEP.Address.ToString();
                     Debug.Log($"[HL2][UDP] Received PC_HERE from {pcIpAddress}");
+                    debugText.text = $"[HL2][UDP] Received PC_HERE from {pcIpAddress}";
                     break;
                 }
             }
@@ -83,6 +92,7 @@ public class HoloLensZmqClient : MonoBehaviour
         if (string.IsNullOrEmpty(pcIpAddress))
         {
             Debug.LogError("[HL2][UDP] Discovery timed out. Cannot find PC.");
+            debugText.text = "[HL2][UDP] Discovery timed out. Cannot find PC.";
             yield break;
         }
 
@@ -101,6 +111,7 @@ public class HoloLensZmqClient : MonoBehaviour
         imageSubscriber.Connect(imageConnectStr);
         imageSubscriber.SubscribeToAnyTopic();
         Debug.Log($"[HL2][ZMQ] SUBscribed to images at {imageConnectStr}");
+        debugText.text = $"[HL2][ZMQ] SUBscribed to images at {imageConnectStr}";
 
         IncomingTexture = new Texture2D(2, 2, TextureFormat.RGB24, false);
 
@@ -115,6 +126,7 @@ public class HoloLensZmqClient : MonoBehaviour
         gazePublisher.Options.SendHighWatermark = 1;
         gazePublisher.Connect(gazeConnectStr);
         Debug.Log($"[HL2][ZMQ] PUBlishing gaze to {gazeConnectStr}");
+        debugText.text = $"[HL2][ZMQ] PUBlishing gaze to {gazeConnectStr}";
 
         // 2c) Begin the coroutine that waits for newImageAvailable
         StartCoroutine(GazePublishCoroutine());
@@ -146,12 +158,14 @@ public class HoloLensZmqClient : MonoBehaviour
                     else
                     {
                         Debug.LogWarning("[HL2][ZMQ] Failed to decode JPEG.");
+                        debugText.text = "[HL2][ZMQ] Failed to decode JPEG.";
                     }
                 }
             }
             catch (Exception ex)
             {
                 Debug.LogError("[HL2][ZMQ] ImageReceiveLoop exception: " + ex.Message);
+                debugText.text = "[HL2][ZMQ] ImageReceiveLoop exception: " + ex.Message;
                 break;
             }
         }
@@ -181,6 +195,7 @@ public class HoloLensZmqClient : MonoBehaviour
             catch (Exception ex)
             {
                 Debug.LogError("[HL2][ZMQ] Failed to publish gaze: " + ex.Message);
+                debugText.text = "[HL2][ZMQ] Failed to publish gaze: " + ex.Message;
             }
 
             // Reset the flag so we wait for the next image:

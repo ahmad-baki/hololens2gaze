@@ -10,8 +10,6 @@ public class GazeTracker : MonoBehaviour
     private GameObject go;
     [SerializeField]
     private float rayMaxDistance = 100f;
-    [SerializeField]
-    private TMP_Text debugText;
     private FuzzyGazeInteractor gazeInteractor;
 
     // Start is called once before the first execution of Update after the MonoBehaviour is created
@@ -22,7 +20,6 @@ public class GazeTracker : MonoBehaviour
         if (gazeInteractor == null)
         {
             Debug.LogError("FuzzyGazeInteractor component not found on this GameObject.");
-            debugText.text = "FuzzyGazeInteractor not found.";
             return;
         }
 
@@ -30,7 +27,6 @@ public class GazeTracker : MonoBehaviour
         if (go == null)
         {
             Debug.LogError("GameObject to move is not assigned.");
-            debugText.text = "GameObject to move is not assigned.";
             return;
         }
     }
@@ -53,13 +49,7 @@ public class GazeTracker : MonoBehaviour
                 (hitPoint.x - canvasPos.x - hitRect.offsetMin.x) / hitRect.rect.width,
                 (hitPoint.y - canvasPos.y - hitRect.offsetMin.y) / hitRect.rect.height
             );
-            debugText.text = $"Object: {hitGO.name}, 3D Position: {hitPoint}, UV Coordinates: {uvPoint}";
-            Debug.Log($"UV Coordinates: {uvPoint}, offset: {hitRect.offsetMin}, {hitRect.offsetMax}");
             go.transform.position = hitPoint;
-        }
-        else
-        {
-            debugText.text = "No hit detected.";
         }
 
     }
