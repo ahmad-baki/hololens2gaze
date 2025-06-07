@@ -58,7 +58,11 @@ public class NetworkManager : MonoBehaviour
 
     void Start()
     {
-        StartCoroutine(DiscoverPCCoroutine());
+        // DEBUG -->
+        pcIpAddress = pcIpAddress ?? "192.168.0.208"; // for debugging purposes
+        StartZmqSockets();
+        // StartCoroutine(DiscoverPCCoroutine());
+        // <--
         OnNewImage += GazePublish;
     }
 
@@ -86,7 +90,6 @@ public class NetworkManager : MonoBehaviour
         IPEndPoint remoteEP = new IPEndPoint(IPAddress.Any, 0);
 
         Debug.Log($"[HL2][UDP] Sending DISCOVER_PC broadcast to {broadcastEP.Address}:{broadcastEP.Port}, waiting for reply ...");
-        debugText.text = $"[HL2][UDP] Sending DISCOVER_PC broadcast to {broadcastEP.Address}:{broadcastEP.Port}, waiting for reply ...";
 
         while (true)
         {
