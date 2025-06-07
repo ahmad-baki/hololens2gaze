@@ -58,11 +58,7 @@ public class NetworkManager : MonoBehaviour
 
     void Start()
     {
-        // DEBUG -->
-        pcIpAddress = pcIpAddress ?? "192.168.0.208"; // for debugging purposes
-        StartZmqSockets();
-        // StartCoroutine(DiscoverPCCoroutine());
-        // <--
+        StartCoroutine(DiscoverPCCoroutine());
         OnNewImage += GazePublish;
     }
 
