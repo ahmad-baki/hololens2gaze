@@ -1,8 +1,6 @@
 using UnityEngine;
 using MixedReality.Toolkit.Input;
 using UnityEngine.Assertions;
-using TMPro;
-using System;
 
 public class GazeTracker : MonoBehaviour
 {

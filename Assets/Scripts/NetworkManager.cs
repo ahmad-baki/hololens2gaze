@@ -6,13 +6,10 @@ using System.Net.Sockets;
 using System.Text;
 using System.Threading;
 using UnityEngine;
-using UnityEngine.UI;
 using NetMQ;
 using NetMQ.Sockets;
 using TMPro;
-using System.Collections.Generic;
 using System.Net.NetworkInformation;
-using System.Linq;
 
 public class NetworkManager : MonoBehaviour
 {
@@ -23,6 +20,7 @@ public class NetworkManager : MonoBehaviour
     [SerializeField]
     private GazeTracker gazeTracker;
     public static event Action OnImageReady = delegate { };
+    public static event Action OnNewImage = delegate { };
 
 
     // --- UDP discovery parameters (unchanged) ---
@@ -50,7 +48,6 @@ public class NetworkManager : MonoBehaviour
     private int currentStep = -1;
     private PullSocket imagePullSocket;
     private PushSocket gazePushSocket;
-    private readonly object textureLock = new object();
 
 
     public Texture2D IncomingTexture
@@ -61,8 +58,8 @@ public class NetworkManager : MonoBehaviour
 
     void Start()
     {
-
         StartCoroutine(DiscoverPCCoroutine());
+        OnNewImage += GazePublish;
     }
 
     void Update()
@@ -70,7 +67,7 @@ public class NetworkManager : MonoBehaviour
         if (newImageAvailable)
         {
             texture.LoadImage(newImageBytes);
-            GazePublish();
+            OnNewImage?.Invoke();
             newImageAvailable = false;
         }
     }
@@ -87,13 +84,13 @@ public class NetworkManager : MonoBehaviour
         IPEndPoint broadcastEP = new IPEndPoint(broadcastAddress, DISCOVERY_PORT);
         byte[] discoverBytes = Encoding.UTF8.GetBytes(DISCOVER_MESSAGE);
         IPEndPoint remoteEP = new IPEndPoint(IPAddress.Any, 0);
-        DateTime startTime = DateTime.UtcNow;
 
-        while ((DateTime.UtcNow - startTime).TotalMilliseconds < UDP_TIMEOUT_MS)
+        Debug.Log($"[HL2][UDP] Sending DISCOVER_PC broadcast to {broadcastEP.Address}:{broadcastEP.Port}, waiting for reply ...");
+        debugText.text = $"[HL2][UDP] Sending DISCOVER_PC broadcast to {broadcastEP.Address}:{broadcastEP.Port}, waiting for reply ...";
+
+        while (true)
         {
             udpClient.SendAsync(discoverBytes, discoverBytes.Length, broadcastEP);
-            Debug.Log("[HL2][UDP] Sent DISCOVER_PC broadcast to " + broadcastEP.Address);
-            debugText.text = "[HL2][UDP] Sent DISCOVER_PC broadcast to " + broadcastEP.Address;
             yield return new WaitForSeconds(0.1f); // Small delay to avoid flooding
             try
             {
@@ -116,16 +113,7 @@ public class NetworkManager : MonoBehaviour
             }
             yield return null;
         }
-
         udpClient.Close();
-
-        if (string.IsNullOrEmpty(pcIpAddress))
-        {
-            Debug.LogError("[HL2][UDP] Discovery timed out. Cannot find PC.");
-            debugText.text = "[HL2][UDP] Discovery timed out. Cannot find PC.";
-            yield break;
-        }
-
         StartZmqSockets();
     }
 
@@ -134,7 +122,6 @@ public class NetworkManager : MonoBehaviour
     {
         AsyncIO.ForceDotNet.Force();
         NetMQConfig.Cleanup();
-
         imagePullSocket = new PullSocket();
         string address = $"tcp://{pcIpAddress}:{ZMQ_IMAGE_PORT}";
         imagePullSocket.Connect(address);
@@ -162,24 +149,24 @@ public class NetworkManager : MonoBehaviour
         {
             try
             {
-                // Receive multi-frame message
                 var msg = imagePullSocket.ReceiveMultipartMessage();
                 if (msg == null || msg.FrameCount != 2)
                 {
-                    Debug.LogWarning("[HL2][ZMQ] Received invalid message, waiting for next frame...");
-                    continue; // Invalid message, continue to next iteration
+                    Debug.LogWarning("[HL2][ZMQ] Received invalid Image, waiting for next frame...");
+                    continue;
                 }
 
                 currentStep = msg[0].ConvertToInt32();
                 byte[] imageBytes = msg[1].Buffer;
-                Debug.Log("[HL2][ZMQ] Received image frame with " + imageBytes.Length + " bytes. Step: " + currentStep);
+
+                Debug.Log($"[HL2][ZMQ] Received image frame with step {currentStep}, size: {imageBytes.Length} bytes");
+
                 newImageBytes = imageBytes;
                 newImageAvailable = true;
             }
             catch (Exception ex)
             {
                 Debug.LogError("[HL2][ZMQ] ImageReceiveLoop exception: " + ex.Message);
-                debugText.text = "[HL2][ZMQ] ImageReceiveLoop exception: " + ex.Message;
                 break;
             }
         }
@@ -190,7 +177,6 @@ public class NetworkManager : MonoBehaviour
         // At this point, a new frame has arrived. Send gaze only once per frame:
         Vector2 gazeXY = gazeTracker.GetGazePointOnTexture();
         string gazeJson = $"{{\"x\": {gazeXY.x}, \"y\": {gazeXY.y}, \"step\": {currentStep}}}";
-        Debug.Log($"[HL2][ZMQ] Publishing gaze: {gazeJson}");
 
         try
         {
@@ -199,10 +185,7 @@ public class NetworkManager : MonoBehaviour
         catch (Exception ex)
         {
             Debug.LogError("[HL2][ZMQ] Failed to publish gaze: " + ex.Message);
-            debugText.text = "[HL2][ZMQ] Failed to publish gaze: " + ex.Message;
         }
-        Debug.Log($"[HL2][ZMQ] Published gaze at ({gazeXY.x}, {gazeXY.y}) for step {currentStep}");
-        debugText.text = $"[HL2][ZMQ] Published gaze at ({gazeXY.x}, {gazeXY.y}) for step {currentStep}";
     }
 
     private void OnDestroy()
@@ -225,7 +208,6 @@ public class NetworkManager : MonoBehaviour
         {
             if (device.NetworkInterfaceType == NetworkInterfaceType.Wireless80211 && device.OperationalStatus == OperationalStatus.Up)
             {
-                IPAddress ipv6Address = device.GetIPProperties().UnicastAddresses[0].Address; //This will give ipv6 address of certain adapter
                 IPAddress ipv4Address = device.GetIPProperties().UnicastAddresses[1].Address; //This will give ipv4 address of certain adapter
                 IPAddress unicastIPv4Mask = device.GetIPProperties().UnicastAddresses[1].IPv4Mask; //This will give ipv4 mask of certain adapter
                 Debug.Log($"[HL2][Network] Found WLAN interface: {device.Name} with IPv4: {ipv4Address} and mask: {unicastIPv4Mask}");
@@ -235,11 +217,6 @@ public class NetworkManager : MonoBehaviour
         }
         Debug.LogError("[HL2][Network] No active WLAN interface found.");
         return null;
-    }
-
-        public static IPAddress GetBroadcastAddress(UnicastIPAddressInformation unicastAddress)
-    {
-        return GetBroadcastAddress(unicastAddress.Address, unicastAddress.IPv4Mask);
     }
 
     public static IPAddress GetBroadcastAddress(IPAddress address, IPAddress mask)
