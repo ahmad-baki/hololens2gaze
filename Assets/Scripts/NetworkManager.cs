@@ -86,6 +86,7 @@ public class NetworkManager : MonoBehaviour
         IPEndPoint remoteEP = new IPEndPoint(IPAddress.Any, 0);
 
         Debug.Log($"[HL2][UDP] Sending DISCOVER_PC broadcast to {broadcastEP.Address}:{broadcastEP.Port}, waiting for reply ...");
+        debugText.text = $"[HL2][UDP] Sending DISCOVER_PC broadcast to {broadcastEP.Address}:{broadcastEP.Port}, waiting for reply ...";
 
         while (true)
         {
@@ -140,6 +141,7 @@ public class NetworkManager : MonoBehaviour
         gazePushSocket.Connect(gazeAddress);
         Debug.Log($"[HL2][ZMQ] Connected to gaze publisher at {gazeAddress}");
         debugText.text = $"[HL2][ZMQ] Connected to gaze publisher at {gazeAddress}";
+        debugText.text = $"[HL2][ZMQ] Connected to publisher at {address}";
     }
 
     void ImageReceiveLoop()
@@ -210,6 +212,7 @@ public class NetworkManager : MonoBehaviour
                 IPAddress ipv4Address = device.GetIPProperties().UnicastAddresses[1].Address; //This will give ipv4 address of certain adapter
                 IPAddress unicastIPv4Mask = device.GetIPProperties().UnicastAddresses[1].IPv4Mask; //This will give ipv4 mask of certain adapter
                 Debug.Log($"[HL2][Network] Found WLAN interface: {device.Name} with IPv4: {ipv4Address} and mask: {unicastIPv4Mask}");
+                debugText.text = $"[HL2][Network] Found WLAN interface: {device.Name} with IPv4: {ipv4Address} and mask: {unicastIPv4Mask}";
                 // Get the broadcast address for the IPv4 address
                 return GetBroadcastAddress(ipv4Address, unicastIPv4Mask);
             }
