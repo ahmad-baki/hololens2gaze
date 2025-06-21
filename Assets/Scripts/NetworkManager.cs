@@ -22,6 +22,7 @@ public class NetworkManager : MonoBehaviour
     public static event Action OnImageReady = delegate { };
     public static event Action OnNewImage = delegate { };
 
+    public static int GAZE_PUBLISH_INTERVAL_MS = 100; // Interval to publish gaze data, in milliseconds
 
     // --- UDP discovery parameters (unchanged) ---
     private const int DISCOVERY_PORT = 5005;
@@ -59,7 +60,7 @@ public class NetworkManager : MonoBehaviour
     void Start()
     {
         StartCoroutine(DiscoverPCCoroutine());
-        OnNewImage += GazePublish;
+        //OnNewImage += GazePublish;
     }
 
     void Update()
@@ -115,6 +116,8 @@ public class NetworkManager : MonoBehaviour
         }
         udpClient.Close();
         StartZmqSockets();
+        // start gaze publishing coroutine
+        StartCoroutine(GazePublishCoroutine());
     }
 
 
@@ -173,8 +176,7 @@ public class NetworkManager : MonoBehaviour
         }
     }
 
-    void GazePublish()
-    {
+    IEnumerator GazePublishCoroutine(){
         // At this point, a new frame has arrived. Send gaze only once per frame:
         Vector2 gazeXY = gazeTracker.GetGazePointOnTexture();
         string gazeJson = $"{{\"x\": {gazeXY.x}, \"y\": {gazeXY.y}, \"step\": {currentStep}}}";
@@ -187,6 +189,7 @@ public class NetworkManager : MonoBehaviour
         {
             Debug.LogError("[HL2][ZMQ] Failed to publish gaze: " + ex.Message);
         }
+        yield return new WaitForSeconds(GAZE_PUBLISH_INTERVAL_MS / 1000f);
     }
 
     private void OnDestroy()
