@@ -180,7 +180,7 @@ public class NetworkManager : MonoBehaviour
     {
         // At this point, a new frame has arrived. Send gaze only once per frame:
         Vector2 gazeXY = gazeTracker.GetGazePointOnTexture();
-        string gazeJson = $"{{\"x\": {gazeXY.x}, \"y\": {gazeXY.y}, \"step\": {currImageTime}}}";
+        string gazeJson = $"{{\"x\": {gazeXY.x}, \"y\": {gazeXY.y}, \"time\": {currImageTime}}}";
 
         try
         {
