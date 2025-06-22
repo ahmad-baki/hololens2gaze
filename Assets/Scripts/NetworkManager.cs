@@ -22,7 +22,7 @@ public class NetworkManager : MonoBehaviour
     public static event Action OnImageReady = delegate { };
     public static event Action OnNewImage = delegate { };
 
-    public static int GAZE_PUBLISH_INTERVAL_MS = 100; // Interval to publish gaze data, in milliseconds
+    public static int GAZE_PUBLISH_INTERVAL_MS = 50; // Interval to publish gaze data, in milliseconds
 
     // --- UDP discovery parameters (unchanged) ---
     private const int DISCOVERY_PORT = 5005;
@@ -46,7 +46,7 @@ public class NetworkManager : MonoBehaviour
 
     // ---- NEW: flag to indicate a fresh image arrived ----
     private volatile bool newImageAvailable = false;
-    private int currentStep = -1;
+    private int currImageTime = -1;
     private PullSocket imagePullSocket;
     private PushSocket gazePushSocket;
 
@@ -160,10 +160,10 @@ public class NetworkManager : MonoBehaviour
                     continue;
                 }
 
-                currentStep = msg[0].ConvertToInt32();
+                currImageTime = msg[0].ConvertToInt32();
                 byte[] imageBytes = msg[1].Buffer;
 
-                Debug.Log($"[HL2][ZMQ] Received image frame with step {currentStep}, size: {imageBytes.Length} bytes");
+                Debug.Log($"[HL2][ZMQ] Received image frame with step {currImageTime}, size: {imageBytes.Length} bytes");
 
                 newImageBytes = imageBytes;
                 newImageAvailable = true;
@@ -176,10 +176,11 @@ public class NetworkManager : MonoBehaviour
         }
     }
 
-    IEnumerator GazePublishCoroutine(){
+    IEnumerator GazePublishCoroutine()
+    {
         // At this point, a new frame has arrived. Send gaze only once per frame:
         Vector2 gazeXY = gazeTracker.GetGazePointOnTexture();
-        string gazeJson = $"{{\"x\": {gazeXY.x}, \"y\": {gazeXY.y}, \"step\": {currentStep}}}";
+        string gazeJson = $"{{\"x\": {gazeXY.x}, \"y\": {gazeXY.y}, \"step\": {currImageTime}}}";
 
         try
         {
