@@ -40,7 +40,9 @@ public class NetworkManager : MonoBehaviour
     private PublisherSocket gazePublisher;
 
     private Thread imageThread;
+    private Thread gazeThread;
     private bool imageThreadRunning = false;
+    private bool gazeThreadRunning;
     private Texture2D texture;
     private byte[] newImageBytes;
 
@@ -48,8 +50,7 @@ public class NetworkManager : MonoBehaviour
     private volatile bool newImageAvailable = false;
     private int currImageTime = -1;
     private PullSocket imagePullSocket;
-    private PushSocket gazePushSocket;
-
+    private ResponseSocket gazeRespSocket;
 
     public Texture2D IncomingTexture
     {
@@ -117,7 +118,7 @@ public class NetworkManager : MonoBehaviour
         udpClient.Close();
         StartZmqSockets();
         // start gaze publishing coroutine
-        StartCoroutine(GazePublishCoroutine());
+        // StartCoroutine(PublishGaze());
     }
 
 
@@ -128,7 +129,6 @@ public class NetworkManager : MonoBehaviour
         imagePullSocket = new PullSocket();
         string address = $"tcp://{pcIpAddress}:{ZMQ_IMAGE_PORT}";
         imagePullSocket.Connect(address);
-        Debug.Log($"[HL2][ZMQ] Connected to image publisher at {address}");
 
         texture = new Texture2D(2, 2, TextureFormat.RGB24, false);
         OnImageReady?.Invoke();
@@ -139,12 +139,15 @@ public class NetworkManager : MonoBehaviour
         imageThread.Start();
 
 
-        gazePushSocket = new PushSocket();
+        gazeRespSocket = new ResponseSocket();
         string gazeAddress = $"tcp://{pcIpAddress}:{ZMQ_GAZE_PORT}";
-        gazePushSocket.Connect(gazeAddress);
-        Debug.Log($"[HL2][ZMQ] Connected to gaze publisher at {gazeAddress}");
-        debugText.text = $"[HL2][ZMQ] Connected to gaze publisher at {gazeAddress}";
-        debugText.text = $"[HL2][ZMQ] Connected to publisher at {address}";
+        gazeRespSocket.Connect(gazeAddress);
+        gazeThreadRunning = true;
+        gazeThread = new Thread(PublishGaze);
+        gazeThread.IsBackground = true;
+        gazeThread.Start();
+
+        debugText.text = $"[HL2][ZMQ] Connected sockets to {address}";
     }
 
     void ImageReceiveLoop()
@@ -176,31 +179,36 @@ public class NetworkManager : MonoBehaviour
         }
     }
 
-    IEnumerator GazePublishCoroutine()
+    void PublishGaze()
     {
-        // At this point, a new frame has arrived. Send gaze only once per frame:
-        Vector2 gazeXY = gazeTracker.GetGazePointOnTexture();
-        string gazeJson = $"{{\"x\": {gazeXY.x}, \"y\": {gazeXY.y}, \"time\": {currImageTime}}}";
-
-        try
+        while (gazeThreadRunning)
         {
-            gazePushSocket.SendFrame(gazeJson);
+            gazeRespSocket.ReceiveFrameString(); // Wait for a request from the server
+            Vector2 gazeXY = gazeTracker.GetGazePointOnTexture();
+            string gazeJson = $"{{\"x\": {gazeXY.x}, \"y\": {gazeXY.y}, \"time\": {currImageTime}}}";
+            try
+            {
+                gazeRespSocket.SendFrame(gazeJson);
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError("[HL2][ZMQ] Failed to publish gaze: " + ex.Message);
+            }
         }
-        catch (Exception ex)
-        {
-            Debug.LogError("[HL2][ZMQ] Failed to publish gaze: " + ex.Message);
-        }
-        yield return new WaitForSeconds(GAZE_PUBLISH_INTERVAL_MS / 1000f);
     }
 
     private void OnDestroy()
     {
         imageThreadRunning = false;
+        gazeThreadRunning = false;
         if (imageThread != null && imageThread.IsAlive)
         {
             imageThread.Join(500);
         }
-
+        if (gazeThread != null && gazeThread.IsAlive)
+        {
+            gazeThread.Join(500);
+        }
         imageSubscriber?.Close();
         gazePublisher?.Close();
         NetMQConfig.Cleanup();
