@@ -48,7 +48,7 @@ public class NetworkManager : MonoBehaviour
 
     // ---- NEW: flag to indicate a fresh image arrived ----
     private volatile bool newImageAvailable = false;
-    private int currImageTime = -1;
+    private float currImageTime = -1;
     private PullSocket imagePullSocket;
     private ResponseSocket gazeRespSocket;
 
@@ -60,7 +60,7 @@ public class NetworkManager : MonoBehaviour
 
     void Start()
     {
-        StartCoroutine(DiscoverPCCoroutine());
+        StartCoroutine(SetupConnectionCoroutine());
         //OnNewImage += GazePublish;
     }
 
@@ -74,7 +74,7 @@ public class NetworkManager : MonoBehaviour
         }
     }
 
-    IEnumerator DiscoverPCCoroutine()
+    IEnumerator SetupConnectionCoroutine()
     {
         UdpClient udpClient = new UdpClient();
         udpClient.EnableBroadcast = true;
@@ -116,9 +116,9 @@ public class NetworkManager : MonoBehaviour
             yield return null;
         }
         udpClient.Close();
+
+
         StartZmqSockets();
-        // start gaze publishing coroutine
-        // StartCoroutine(PublishGaze());
     }
 
 
@@ -143,7 +143,7 @@ public class NetworkManager : MonoBehaviour
         string gazeAddress = $"tcp://{pcIpAddress}:{ZMQ_GAZE_PORT}";
         gazeRespSocket.Connect(gazeAddress);
         gazeThreadRunning = true;
-        gazeThread = new Thread(PublishGaze);
+        gazeThread = new Thread(PublishGazeLoop);
         gazeThread.IsBackground = true;
         gazeThread.Start();
 
@@ -162,8 +162,9 @@ public class NetworkManager : MonoBehaviour
                     Debug.LogWarning("[HL2][ZMQ] Received invalid Image, waiting for next frame...");
                     continue;
                 }
+                currImageTime = System.BitConverter.ToSingle(msg[0].Buffer, 0);
+                debugText.text = $"[HL2][ZMQ] Received image frame with time {currImageTime}";
 
-                currImageTime = msg[0].ConvertToInt32();
                 byte[] imageBytes = msg[1].Buffer;
 
                 Debug.Log($"[HL2][ZMQ] Received image frame with step {currImageTime}, size: {imageBytes.Length} bytes");
@@ -179,15 +180,18 @@ public class NetworkManager : MonoBehaviour
         }
     }
 
-    void PublishGaze()
+    void PublishGazeLoop()
     {
+        debugText.text = "[HL2][ZMQ] Gaze publisher started, waiting for requests...";
         while (gazeThreadRunning)
         {
             gazeRespSocket.ReceiveFrameString(); // Wait for a request from the server
+            debugText.text = "[HL2][ZMQ] Gaze request received, publishing gaze data...";
             Vector2 gazeXY = gazeTracker.GetGazePointOnTexture();
             string gazeJson = $"{{\"x\": {gazeXY.x}, \"y\": {gazeXY.y}, \"time\": {currImageTime}}}";
             try
             {
+                debugText.text = $"[HL2][ZMQ] Publishing gaze data: {gazeJson}";
                 gazeRespSocket.SendFrame(gazeJson);
             }
             catch (Exception ex)
@@ -214,7 +218,7 @@ public class NetworkManager : MonoBehaviour
         NetMQConfig.Cleanup();
     }
 
-    private IPAddress GetWLANBroadcastAddress()
+    public static IPAddress GetWLANBroadcastAddress()
     {
         NetworkInterface[] intf = NetworkInterface.GetAllNetworkInterfaces();
         foreach (NetworkInterface device in intf)
@@ -224,7 +228,6 @@ public class NetworkManager : MonoBehaviour
                 IPAddress ipv4Address = device.GetIPProperties().UnicastAddresses[1].Address; //This will give ipv4 address of certain adapter
                 IPAddress unicastIPv4Mask = device.GetIPProperties().UnicastAddresses[1].IPv4Mask; //This will give ipv4 mask of certain adapter
                 Debug.Log($"[HL2][Network] Found WLAN interface: {device.Name} with IPv4: {ipv4Address} and mask: {unicastIPv4Mask}");
-                debugText.text = $"[HL2][Network] Found WLAN interface: {device.Name} with IPv4: {ipv4Address} and mask: {unicastIPv4Mask}";
                 // Get the broadcast address for the IPv4 address
                 return GetBroadcastAddress(ipv4Address, unicastIPv4Mask);
             }
