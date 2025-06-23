@@ -41,8 +41,8 @@ public class NetworkManager : MonoBehaviour
 
     private Thread imageThread;
     private Thread gazeThread;
-    private bool imageThreadRunning = false;
-    private bool gazeThreadRunning = false;
+    private volatile bool imageThreadRunning = false;
+    private volatile bool gazeThreadRunning = false;
     private Texture2D texture;
     private byte[] newImageBytes;
 
@@ -143,6 +143,11 @@ public class NetworkManager : MonoBehaviour
         gazeRespSocket = new ResponseSocket();
         string gazeAddress = $"tcp://{pcIpAddress}:{ZMQ_GAZE_PORT}";
         gazeRespSocket.Connect(gazeAddress);
+        // new approach
+        
+        gazeRespSocket = new ResponseSocket();
+        string localGazeAddress = $"tcp://*:{ZMQ_GAZE_PORT}";
+        gazeRespSocket.Bind(localGazeAddress);
 
         gazeThreadRunning = true;
         gazeThread = new Thread(PublishGazeLoop);
@@ -154,7 +159,7 @@ public class NetworkManager : MonoBehaviour
 
     void ImageReceiveLoop()
     {
-        while (imageThreadRunning)
+        while (true)
         {
             try
             {
@@ -185,13 +190,14 @@ public class NetworkManager : MonoBehaviour
     void PublishGazeLoop()
     {
         debugText.text = "[HL2][ZMQ] Gaze publisher started, waiting for requests...";
-        while (gazeThreadRunning)
+        while (true)
         {
-            debugText.text = "[HL2][ZMQ] Gaze request received, publishing gaze data...";
+            debugText.text = "[HL2][ZMQ] RUNNING in Loop, waiting for gaze requests...";
             // respond to the request from the publisher
             try
             {
-                gazeRespSocket.ReceiveFrameString();
+                var mess = gazeRespSocket.ReceiveFrameString();
+                debugText.text = $"[HL2][ZMQ] Received gaze request: {mess}";
             }
             catch (Exception ex)
             {
