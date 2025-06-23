@@ -149,7 +149,7 @@ public class NetworkManager : MonoBehaviour
         gazeThread.IsBackground = true;
         gazeThread.Start();
 
-        debugText.text = $"[HL2][ZMQ] Connected sockets to {address}";
+        debugText.text = $"[HL2][ZMQ] Connected gaze-socket to {gazeAddress}";
     }
 
     void ImageReceiveLoop()
