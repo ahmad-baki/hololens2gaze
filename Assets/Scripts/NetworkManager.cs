@@ -39,8 +39,8 @@ public class NetworkManager : MonoBehaviour
     private SubscriberSocket imageSubscriber;
     private PublisherSocket gazePublisher;
 
-    private Thread imageThread;
-    private Thread gazeThread;
+    // private Thread imageThread;
+    // private Thread gazeThread;
     private volatile bool imageThreadRunning = false;
     private volatile bool gazeThreadRunning = false;
     private Texture2D texture;
@@ -75,31 +75,14 @@ public class NetworkManager : MonoBehaviour
 
         if (gazeThreadRunning && gazeRespSocket != null && gazeRespSocket.HasIn)
         {
-            // Process incoming gaze requests
-            debugText.text = "[HL2][ZMQ] Handling gaze requests...";
-            // respond to the request from the publisher
-            try
-            {
-                var mess = gazeRespSocket.ReceiveFrameString();
-                debugText.text = $"[HL2][ZMQ] Received gaze request: {mess}";
-            }
-            catch (Exception ex)
-            {
-                Debug.LogError("[HL2][ZMQ] Failed to receive gaze request: " + ex.Message);
-                return; // 
-            }
-            Vector2 gazeXY = gazeTracker.GetGazePointOnTexture();
-            string gazeJson = $"{{\"x\": {gazeXY.x}, \"y\": {gazeXY.y}, \"time\": {currImageTime}}}";
-            try
-            {
-                debugText.text = $"[HL2][ZMQ] Publishing gaze data: {gazeJson}";
-                gazeRespSocket.SendFrame(gazeJson);
-            }
-            catch (Exception ex)
-            {
-                Debug.LogError("[HL2][ZMQ] Failed to publish gaze: " + ex.Message);
-            }
+            PublishGaze();
         }
+
+        if (imageThreadRunning && imagePullSocket != null && imagePullSocket.HasIn)
+        {
+            ReceiveImage();
+        }
+
     }
 
     IEnumerator SetupConnectionCoroutine()
@@ -163,16 +146,16 @@ public class NetworkManager : MonoBehaviour
         imagePullSocket.Connect(address);
 
         imageThreadRunning = true;
-        imageThread = new Thread(ImageReceiveLoop);
-        imageThread.IsBackground = true;
-        imageThread.Start();
+        // imageThread = new Thread(ImageReceiveLoop);
+        // imageThread.IsBackground = true;
+        // imageThread.Start();
 
 
         gazeRespSocket = new ResponseSocket();
         string gazeAddress = $"tcp://{pcIpAddress}:{ZMQ_GAZE_PORT}";
         gazeRespSocket.Connect(gazeAddress);
         // new approach
-        
+
         gazeRespSocket = new ResponseSocket();
         string localGazeAddress = $"tcp://*:{ZMQ_GAZE_PORT}";
         gazeRespSocket.Bind(localGazeAddress);
@@ -180,8 +163,8 @@ public class NetworkManager : MonoBehaviour
         gazeThreadRunning = true;
         // gazeThread = new Thread(PublishGazeLoop);
         debugText.text = "[HL2][ZMQ] Gaze publisher started, waiting for requests...";
-        gazeThread.IsBackground = true;
-        gazeThread.Start();
+        // gazeThread.IsBackground = true;
+        // gazeThread.Start();
 
         debugText.text = $"[HL2][ZMQ] Connected gaze-socket to {gazeAddress}";
     }
@@ -213,6 +196,47 @@ public class NetworkManager : MonoBehaviour
                 Debug.LogError("[HL2][ZMQ] ImageReceiveLoop exception: " + ex.Message);
                 break;
             }
+        }
+    }
+
+    void ReceiveImage()
+    {
+        try
+        {
+            var msg = imagePullSocket.ReceiveMultipartMessage();
+            if (msg == null || msg.FrameCount != 2)
+            {
+                Debug.LogWarning("[HL2][ZMQ] Received invalid Image, waiting for next frame...");
+                return;
+            }
+            currImageTime = System.BitConverter.ToSingle(msg[0].Buffer, 0);
+            debugText.text = $"[HL2][ZMQ] Received image frame with time {currImageTime}";
+
+            byte[] imageBytes = msg[1].Buffer;
+
+            Debug.Log($"[HL2][ZMQ] Received image frame with step {currImageTime}, size: {imageBytes.Length} bytes");
+
+            newImageBytes = imageBytes;
+            newImageAvailable = true;
+        }
+        catch (Exception ex)
+        {
+            Debug.LogError("[HL2][ZMQ] ReceiveImage exception: " + ex.Message);
+        }
+    }
+
+    void PublishGaze()
+    {
+        Vector2 gazeXY = gazeTracker.GetGazePointOnTexture();
+        string gazeJson = $"{{\"x\": {gazeXY.x}, \"y\": {gazeXY.y}, \"time\": {currImageTime}}}";
+        try
+        {
+            debugText.text = $"[HL2][ZMQ] Publishing gaze data: {gazeJson}";
+            gazePublisher.SendFrame(gazeJson);
+        }
+        catch (Exception ex)
+        {
+            Debug.LogError("[HL2][ZMQ] Failed to publish gaze: " + ex.Message);
         }
     }
 
@@ -251,14 +275,14 @@ public class NetworkManager : MonoBehaviour
     {
         imageThreadRunning = false;
         gazeThreadRunning = false;
-        if (imageThread != null && imageThread.IsAlive)
-        {
-            imageThread.Join(500);
-        }
-        if (gazeThread != null && gazeThread.IsAlive)
-        {
-            gazeThread.Join(500);
-        }
+        // if (imageThread != null && imageThread.IsAlive)
+        // {
+        //     imageThread.Join(500);
+        // }
+        // if (gazeThread != null && gazeThread.IsAlive)
+        // {
+        //     gazeThread.Join(500);
+        // }
         imageSubscriber?.Close();
         gazePublisher?.Close();
         NetMQConfig.Cleanup();
