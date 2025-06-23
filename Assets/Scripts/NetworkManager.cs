@@ -72,6 +72,34 @@ public class NetworkManager : MonoBehaviour
             OnNewImage?.Invoke();
             newImageAvailable = false;
         }
+
+        if (gazeThreadRunning && gazeRespSocket != null && gazeRespSocket.HasIn)
+        {
+            // Process incoming gaze requests
+            debugText.text = "[HL2][ZMQ] Handling gaze requests...";
+            // respond to the request from the publisher
+            try
+            {
+                var mess = gazeRespSocket.ReceiveFrameString();
+                debugText.text = $"[HL2][ZMQ] Received gaze request: {mess}";
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError("[HL2][ZMQ] Failed to receive gaze request: " + ex.Message);
+                return; // 
+            }
+            Vector2 gazeXY = gazeTracker.GetGazePointOnTexture();
+            string gazeJson = $"{{\"x\": {gazeXY.x}, \"y\": {gazeXY.y}, \"time\": {currImageTime}}}";
+            try
+            {
+                debugText.text = $"[HL2][ZMQ] Publishing gaze data: {gazeJson}";
+                gazeRespSocket.SendFrame(gazeJson);
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError("[HL2][ZMQ] Failed to publish gaze: " + ex.Message);
+            }
+        }
     }
 
     IEnumerator SetupConnectionCoroutine()
@@ -150,7 +178,8 @@ public class NetworkManager : MonoBehaviour
         gazeRespSocket.Bind(localGazeAddress);
 
         gazeThreadRunning = true;
-        gazeThread = new Thread(PublishGazeLoop);
+        // gazeThread = new Thread(PublishGazeLoop);
+        debugText.text = "[HL2][ZMQ] Gaze publisher started, waiting for requests...";
         gazeThread.IsBackground = true;
         gazeThread.Start();
 
