@@ -42,7 +42,7 @@ public class NetworkManager : MonoBehaviour
     private Thread imageThread;
     private Thread gazeThread;
     private bool imageThreadRunning = false;
-    private bool gazeThreadRunning;
+    private bool gazeThreadRunning = false;
     private Texture2D texture;
     private byte[] newImageBytes;
 
@@ -126,12 +126,13 @@ public class NetworkManager : MonoBehaviour
     {
         AsyncIO.ForceDotNet.Force();
         NetMQConfig.Cleanup();
+
+        texture = new Texture2D(2, 2, TextureFormat.RGB24, false);
+        //OnImageReady?.Invoke();
+
         imagePullSocket = new PullSocket();
         string address = $"tcp://{pcIpAddress}:{ZMQ_IMAGE_PORT}";
         imagePullSocket.Connect(address);
-
-        texture = new Texture2D(2, 2, TextureFormat.RGB24, false);
-        OnImageReady?.Invoke();
 
         imageThreadRunning = true;
         imageThread = new Thread(ImageReceiveLoop);
@@ -142,12 +143,13 @@ public class NetworkManager : MonoBehaviour
         gazeRespSocket = new ResponseSocket();
         string gazeAddress = $"tcp://{pcIpAddress}:{ZMQ_GAZE_PORT}";
         gazeRespSocket.Connect(gazeAddress);
+
         gazeThreadRunning = true;
         gazeThread = new Thread(PublishGazeLoop);
         gazeThread.IsBackground = true;
         gazeThread.Start();
 
-        debugText.text = $"[HL2][ZMQ] Connected sockets to {address}";
+        debugText.text = $"[HL2][ZMQ] Connected gaze-socket to {gazeAddress}";
     }
 
     void ImageReceiveLoop()
@@ -185,8 +187,17 @@ public class NetworkManager : MonoBehaviour
         debugText.text = "[HL2][ZMQ] Gaze publisher started, waiting for requests...";
         while (gazeThreadRunning)
         {
-            gazeRespSocket.ReceiveFrameString(); // Wait for a request from the server
             debugText.text = "[HL2][ZMQ] Gaze request received, publishing gaze data...";
+            // respond to the request from the publisher
+            try
+            {
+                gazeRespSocket.ReceiveFrameString();
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError("[HL2][ZMQ] Failed to receive gaze request: " + ex.Message);
+                continue;
+            }
             Vector2 gazeXY = gazeTracker.GetGazePointOnTexture();
             string gazeJson = $"{{\"x\": {gazeXY.x}, \"y\": {gazeXY.y}, \"time\": {currImageTime}}}";
             try
