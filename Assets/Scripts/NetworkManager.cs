@@ -185,7 +185,16 @@ public class NetworkManager : MonoBehaviour
     {
         while (gazeThreadRunning)
         {
-            gazeRespSocket.ReceiveFrameString(); // Wait for a request from the server
+            // respond to the request from the publisher
+            try
+            {
+                gazeRespSocket.ReceiveFrameString();
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError("[HL2][ZMQ] Failed to receive gaze request: " + ex.Message);
+                continue;
+            }
             Vector2 gazeXY = gazeTracker.GetGazePointOnTexture();
             string gazeJson = $"{{\"x\": {gazeXY.x}, \"y\": {gazeXY.y}, \"time\": {currImageTime}}}";
             try
