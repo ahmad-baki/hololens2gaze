@@ -42,7 +42,7 @@ public class NetworkManager : MonoBehaviour
     private Thread imageThread;
     private Thread gazeThread;
     private bool imageThreadRunning = false;
-    private bool gazeThreadRunning;
+    private bool gazeThreadRunning = false;
     private Texture2D texture;
     private byte[] newImageBytes;
 
@@ -126,12 +126,13 @@ public class NetworkManager : MonoBehaviour
     {
         AsyncIO.ForceDotNet.Force();
         NetMQConfig.Cleanup();
+
+        texture = new Texture2D(2, 2, TextureFormat.RGB24, false);
+        //OnImageReady?.Invoke();
+
         imagePullSocket = new PullSocket();
         string address = $"tcp://{pcIpAddress}:{ZMQ_IMAGE_PORT}";
         imagePullSocket.Connect(address);
-
-        texture = new Texture2D(2, 2, TextureFormat.RGB24, false);
-        OnImageReady?.Invoke();
 
         imageThreadRunning = true;
         imageThread = new Thread(ImageReceiveLoop);
@@ -142,6 +143,7 @@ public class NetworkManager : MonoBehaviour
         gazeRespSocket = new ResponseSocket();
         string gazeAddress = $"tcp://{pcIpAddress}:{ZMQ_GAZE_PORT}";
         gazeRespSocket.Connect(gazeAddress);
+
         gazeThreadRunning = true;
         gazeThread = new Thread(PublishGaze);
         gazeThread.IsBackground = true;
