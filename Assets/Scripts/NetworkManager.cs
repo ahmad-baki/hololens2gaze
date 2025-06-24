@@ -37,8 +37,8 @@ public class NetworkManager : MonoBehaviour
     private const int ZMQ_IMAGE_PORT = 5006;
     private const int ZMQ_GAZE_PORT = 5007;
 
-    private SubscriberSocket imageSubscriber;
-    private PublisherSocket gazePublisher;
+    private SubscriberSocket imageSub;
+    // private PublisherSocket gazePublisher;
 
     // private Thread imageThread;
     // private Thread gazeThread;
@@ -50,7 +50,6 @@ public class NetworkManager : MonoBehaviour
     // ---- NEW: flag to indicate a fresh image arrived ----
     private volatile bool newImageAvailable = false;
     private double currImageTime = -1;
-    private PullSocket imagePullSocket;
     private ResponseSocket gazeRespSocket;
 
     public Texture2D IncomingTexture
@@ -79,10 +78,10 @@ public class NetworkManager : MonoBehaviour
             PublishGaze();
         }
 
-        if (imageThreadRunning && imagePullSocket != null && imagePullSocket.HasIn)
-        {
-            ReceiveImage();
-        }
+        // if (imageThreadRunning && imagePullSocket != null && imagePullSocket.HasIn)
+        // {
+        //     ReceiveImage();
+        // }
 
     }
 
@@ -142,9 +141,9 @@ public class NetworkManager : MonoBehaviour
         texture = new Texture2D(2, 2, TextureFormat.RGB24, false);
         //OnImageReady?.Invoke();
 
-        imagePullSocket = new PullSocket();
+        imageSub = new SubscriberSocket();
         string address = $"tcp://{pcIpAddress}:{ZMQ_IMAGE_PORT}";
-        imagePullSocket.Connect(address);
+        imageSub.Connect(address);
 
         imageThreadRunning = true;
         // imageThread = new Thread(ImageReceiveLoop);
@@ -176,7 +175,7 @@ public class NetworkManager : MonoBehaviour
         {
             try
             {
-                var msg = imagePullSocket.ReceiveMultipartMessage();
+                var msg = imageSub.ReceiveMultipartMessage();
                 if (msg == null || msg.FrameCount != 2)
                 {
                     Debug.LogWarning("[HL2][ZMQ] Received invalid Image, waiting for next frame...");
@@ -204,7 +203,7 @@ public class NetworkManager : MonoBehaviour
     {
         try
         {
-            var msg = imagePullSocket.ReceiveMultipartMessage();
+            var msg = imageSub.ReceiveMultipartMessage();
             if (msg == null || msg.FrameCount != 2)
             {
                 Debug.LogWarning("[HL2][ZMQ] Received invalid Image, waiting for next frame...");
@@ -239,11 +238,13 @@ public class NetworkManager : MonoBehaviour
 
     void PublishGaze()
     {
+        var mess = gazeRespSocket.ReceiveFrameString();
+        debugText.text = $"[HL2][ZMQ] Received gaze request: {mess}";
         Vector2 gazeXY = gazeTracker.GetGazePointOnTexture();
         string gazeJson = $"{{\"x\": {gazeXY.x}, \"y\": {gazeXY.y}, \"time\": {currImageTime}}}";
         try
         {
-            gazePublisher.SendFrame(gazeJson);
+            gazeRespSocket.SendFrame(gazeJson);
             debugText.text = $"[HL2][ZMQ] Published gaze data: {gazeJson}";
         }
         catch (Exception ex)
@@ -295,8 +296,8 @@ public class NetworkManager : MonoBehaviour
         // {
         //     gazeThread.Join(500);
         // }
-        imageSubscriber?.Close();
-        gazePublisher?.Close();
+        imageSub?.Close();
+        gazeRespSocket?.Close();
         NetMQConfig.Cleanup();
     }
 
