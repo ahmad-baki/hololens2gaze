@@ -49,7 +49,7 @@ public class NetworkManager : MonoBehaviour
 
     // ---- NEW: flag to indicate a fresh image arrived ----
     private volatile bool newImageAvailable = false;
-    private double currImageTime = -1;
+    private string currImageTime = "-1";
     private ResponseSocket gazeRespSocket;
 
     public Texture2D IncomingTexture
@@ -176,6 +176,8 @@ public class NetworkManager : MonoBehaviour
         try
         {
             debugText.text = "[HL2][ZMQ] Waiting for image frame...";
+
+            // [<str-bytes>, <image-bytes>]
             var msg = imageSub.ReceiveMultipartMessage();
             debugText.text = "[HL2][ZMQ] Received image frame, processing...";
             if (msg == null || msg.FrameCount != 2)
@@ -189,12 +191,9 @@ public class NetworkManager : MonoBehaviour
                 Debug.LogWarning("[HL2][ZMQ] Received invalid time frame, expected 8 bytes, got " + bytes.Length);
                 return;
             }
-            if (BitConverter.IsLittleEndian)
-                Array.Reverse(bytes);
-            // now reinterpret the 8 bytes as a Double
-            currImageTime = BitConverter.ToDouble(bytes, 0);
+            // msg[0] is a byte array with the time in string format
+            currImageTime = Encoding.UTF8.GetString(bytes);
 
-            currImageTime = System.BitConverter.ToSingle(msg[0].Buffer, 0);
             debugText.text = $"[HL2][ZMQ] Received image frame with time {currImageTime}";
 
             byte[] imageBytes = msg[1].Buffer;
