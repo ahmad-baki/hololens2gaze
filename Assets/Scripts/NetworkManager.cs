@@ -243,8 +243,8 @@ public class NetworkManager : MonoBehaviour
         string gazeJson = $"{{\"x\": {gazeXY.x}, \"y\": {gazeXY.y}, \"time\": {currImageTime}}}";
         try
         {
-            debugText.text = $"[HL2][ZMQ] Publishing gaze data: {gazeJson}";
             gazePublisher.SendFrame(gazeJson);
+            debugText.text = $"[HL2][ZMQ] Published gaze data: {gazeJson}";
         }
         catch (Exception ex)
         {
