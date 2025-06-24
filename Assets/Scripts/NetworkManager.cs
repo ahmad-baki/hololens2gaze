@@ -139,7 +139,7 @@ public class NetworkManager : MonoBehaviour
         NetMQConfig.Cleanup();
 
         texture = new Texture2D(2, 2, TextureFormat.RGB24, false);
-        //OnImageReady?.Invoke();
+        OnImageReady?.Invoke();
 
         imageSub = new SubscriberSocket();
         imageSub.Subscribe("");
