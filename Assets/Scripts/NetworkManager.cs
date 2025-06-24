@@ -10,6 +10,7 @@ using NetMQ;
 using NetMQ.Sockets;
 using TMPro;
 using System.Net.NetworkInformation;
+using MixedReality.Toolkit;
 
 public class NetworkManager : MonoBehaviour
 {
@@ -48,7 +49,7 @@ public class NetworkManager : MonoBehaviour
 
     // ---- NEW: flag to indicate a fresh image arrived ----
     private volatile bool newImageAvailable = false;
-    private float currImageTime = -1;
+    private double currImageTime = -1;
     private PullSocket imagePullSocket;
     private ResponseSocket gazeRespSocket;
 
@@ -209,6 +210,17 @@ public class NetworkManager : MonoBehaviour
                 Debug.LogWarning("[HL2][ZMQ] Received invalid Image, waiting for next frame...");
                 return;
             }
+            var bytes = msg[0].Buffer;
+            if (bytes.Length != 8)
+            {
+                Debug.LogWarning("[HL2][ZMQ] Received invalid time frame, expected 8 bytes, got " + bytes.Length);
+                return;
+            }
+            if (BitConverter.IsLittleEndian)
+                Array.Reverse(bytes);
+            // now reinterpret the 8 bytes as a Double
+            currImageTime = BitConverter.ToDouble(bytes, 0);
+
             currImageTime = System.BitConverter.ToSingle(msg[0].Buffer, 0);
             debugText.text = $"[HL2][ZMQ] Received image frame with time {currImageTime}";
 
