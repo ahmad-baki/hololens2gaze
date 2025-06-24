@@ -167,7 +167,7 @@ public class NetworkManager : MonoBehaviour
         // gazeThread.IsBackground = true;
         // gazeThread.Start();
 
-        debugText.text = $"[HL2][ZMQ] Connected gaze-socket to {gazeAddress}";
+        debugText.text = $"[HL2][ZMQ] Connected gaze-socket to {localGazeAddress}";
     }
 
 
