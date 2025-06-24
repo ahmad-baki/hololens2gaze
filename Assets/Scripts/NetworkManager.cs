@@ -174,7 +174,7 @@ public class NetworkManager : MonoBehaviour
     {
         try
         {
-            // [<str-bytes>, <image-bytes>]
+            // [<utf8-bytes>, <jpg-bytes>]
             var msg = imageSub.ReceiveMultipartMessage();
             if (msg == null || msg.FrameCount != 2)
             {
@@ -182,20 +182,11 @@ public class NetworkManager : MonoBehaviour
                 return;
             }
             var bytes = msg[0].Buffer;
-            if (bytes.Length != 8)
-            {
-                Debug.LogWarning("[HL2][ZMQ] Received invalid time frame, expected 8 bytes, got " + bytes.Length);
-                return;
-            }
-            // msg[0] is a byte array with the time in string format
             currImageTime = Encoding.UTF8.GetString(bytes);
-
             debugText.text = $"[HL2][ZMQ] Received image frame with time {currImageTime}";
 
             byte[] imageBytes = msg[1].Buffer;
-
             Debug.Log($"[HL2][ZMQ] Received image frame with step {currImageTime}, size: {imageBytes.Length} bytes");
-
             newImageBytes = imageBytes;
             newImageAvailable = true;
         }
