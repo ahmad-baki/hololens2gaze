@@ -174,7 +174,9 @@ public class NetworkManager : MonoBehaviour
     {
         try
         {
+            debugText.text = "[HL2][ZMQ] Waiting for image frame...";
             var msg = imageSub.ReceiveMultipartMessage();
+            debugText.text = "[HL2][ZMQ] Received image frame, processing...";
             if (msg == null || msg.FrameCount != 2)
             {
                 Debug.LogWarning("[HL2][ZMQ] Received invalid Image, waiting for next frame...");
@@ -210,13 +212,11 @@ public class NetworkManager : MonoBehaviour
     void PublishGaze()
     {
         var mess = gazeRespSocket.ReceiveFrameString();
-        debugText.text = $"[HL2][ZMQ] Received gaze request: {mess}";
         Vector2 gazeXY = gazeTracker.GetGazePointOnTexture();
         string gazeJson = $"{{\"x\": {gazeXY.x}, \"y\": {gazeXY.y}, \"time\": {currImageTime}}}";
         try
         {
             gazeRespSocket.SendFrame(gazeJson);
-            debugText.text = $"[HL2][ZMQ] Published gaze data: {gazeJson}";
         }
         catch (Exception ex)
         {
