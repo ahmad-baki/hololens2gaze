@@ -77,7 +77,6 @@ public class NetworkManager : MonoBehaviour
         {
             PublishGaze();
         }
-        debugText.text = $"[HL2][ZMQ] imageSub.HasIn: {imageSub.HasIn}";
         if (imageThreadRunning && imageSub != null && imageSub.HasIn)
         {
             ReceiveImage();
@@ -175,11 +174,8 @@ public class NetworkManager : MonoBehaviour
     {
         try
         {
-            debugText.text = "[HL2][ZMQ] Waiting for image frame...";
-
             // [<str-bytes>, <image-bytes>]
             var msg = imageSub.ReceiveMultipartMessage();
-            debugText.text = "[HL2][ZMQ] Received image frame, processing...";
             if (msg == null || msg.FrameCount != 2)
             {
                 Debug.LogWarning("[HL2][ZMQ] Received invalid Image, waiting for next frame...");
