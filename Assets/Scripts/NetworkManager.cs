@@ -222,66 +222,66 @@ public class NetworkManager : MonoBehaviour
 
 #region OLD_CODE
 
-    void PublishGazeLoop()
-    {
-        debugText.text = "[HL2][ZMQ] Gaze publisher started, waiting for requests...";
-        while (true)
-        {
-            debugText.text = "[HL2][ZMQ] RUNNING in Loop, waiting for gaze requests...";
-            // respond to the request from the publisher
-            try
-            {
-                var mess = gazeRespSocket.ReceiveFrameString();
-                debugText.text = $"[HL2][ZMQ] Received gaze request: {mess}";
-            }
-            catch (Exception ex)
-            {
-                Debug.LogError("[HL2][ZMQ] Failed to receive gaze request: " + ex.Message);
-                continue;
-            }
-            Vector2 gazeXY = gazeTracker.GetGazePointOnTexture();
-            string gazeJson = $"{{\"x\": {gazeXY.x}, \"y\": {gazeXY.y}, \"time\": {currImageTime}}}";
-            try
-            {
-                debugText.text = $"[HL2][ZMQ] Publishing gaze data: {gazeJson}";
-                gazeRespSocket.SendFrame(gazeJson);
-            }
-            catch (Exception ex)
-            {
-                Debug.LogError("[HL2][ZMQ] Failed to publish gaze: " + ex.Message);
-            }
-        }
-    }
+    // void PublishGazeLoop()
+    // {
+    //     debugText.text = "[HL2][ZMQ] Gaze publisher started, waiting for requests...";
+    //     while (true)
+    //     {
+    //         debugText.text = "[HL2][ZMQ] RUNNING in Loop, waiting for gaze requests...";
+    //         // respond to the request from the publisher
+    //         try
+    //         {
+    //             var mess = gazeRespSocket.ReceiveFrameString();
+    //             debugText.text = $"[HL2][ZMQ] Received gaze request: {mess}";
+    //         }
+    //         catch (Exception ex)
+    //         {
+    //             Debug.LogError("[HL2][ZMQ] Failed to receive gaze request: " + ex.Message);
+    //             continue;
+    //         }
+    //         Vector2 gazeXY = gazeTracker.GetGazePointOnTexture();
+    //         string gazeJson = $"{{\"x\": {gazeXY.x}, \"y\": {gazeXY.y}, \"time\": {currImageTime}}}";
+    //         try
+    //         {
+    //             debugText.text = $"[HL2][ZMQ] Publishing gaze data: {gazeJson}";
+    //             gazeRespSocket.SendFrame(gazeJson);
+    //         }
+    //         catch (Exception ex)
+    //         {
+    //             Debug.LogError("[HL2][ZMQ] Failed to publish gaze: " + ex.Message);
+    //         }
+    //     }
+    // }
 
-        void ImageReceiveLoop()
-    {
-        while (true)
-        {
-            try
-            {
-                var msg = imageSub.ReceiveMultipartMessage();
-                if (msg == null || msg.FrameCount != 2)
-                {
-                    Debug.LogWarning("[HL2][ZMQ] Received invalid Image, waiting for next frame...");
-                    continue;
-                }
-                currImageTime = System.BitConverter.ToSingle(msg[0].Buffer, 0);
-                debugText.text = $"[HL2][ZMQ] Received image frame with time {currImageTime}";
+    //     void ImageReceiveLoop()
+    // {
+    //     while (true)
+    //     {
+    //         try
+    //         {
+    //             var msg = imageSub.ReceiveMultipartMessage();
+    //             if (msg == null || msg.FrameCount != 2)
+    //             {
+    //                 Debug.LogWarning("[HL2][ZMQ] Received invalid Image, waiting for next frame...");
+    //                 continue;
+    //             }
+    //             currImageTime = System.BitConverter.ToSingle(msg[0].Buffer, 0);
+    //             debugText.text = $"[HL2][ZMQ] Received image frame with time {currImageTime}";
 
-                byte[] imageBytes = msg[1].Buffer;
+    //             byte[] imageBytes = msg[1].Buffer;
 
-                Debug.Log($"[HL2][ZMQ] Received image frame with step {currImageTime}, size: {imageBytes.Length} bytes");
+    //             Debug.Log($"[HL2][ZMQ] Received image frame with step {currImageTime}, size: {imageBytes.Length} bytes");
 
-                newImageBytes = imageBytes;
-                newImageAvailable = true;
-            }
-            catch (Exception ex)
-            {
-                Debug.LogError("[HL2][ZMQ] ImageReceiveLoop exception: " + ex.Message);
-                break;
-            }
-        }
-    }
+    //             newImageBytes = imageBytes;
+    //             newImageAvailable = true;
+    //         }
+    //         catch (Exception ex)
+    //         {
+    //             Debug.LogError("[HL2][ZMQ] ImageReceiveLoop exception: " + ex.Message);
+    //             break;
+    //         }
+    //     }
+    // }
 
 #endregion
 
