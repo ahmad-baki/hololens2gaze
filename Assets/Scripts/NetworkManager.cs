@@ -40,8 +40,8 @@ public class NetworkManager : MonoBehaviour
     private SubscriberSocket imageSub;
     // private PublisherSocket gazePublisher;
 
-    // private Thread imageThread;
-    // private Thread gazeThread;
+    private Thread imageThread;
+    private Thread gazeThread;
     private volatile bool imageThreadRunning = false;
     private volatile bool gazeThreadRunning = false;
     private Texture2D texture;
@@ -164,8 +164,6 @@ public class NetworkManager : MonoBehaviour
         gazeThread = new Thread(PublishGazeLoop);
         gazeThread.IsBackground = true;
         gazeThread.Start();
-
-        debugText.text = $"[HL2][ZMQ] Connected gaze-socket to {localGazeAddress}";
     }
 
 
