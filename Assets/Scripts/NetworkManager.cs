@@ -78,10 +78,10 @@ public class NetworkManager : MonoBehaviour
             PublishGaze();
         }
 
-        // if (imageThreadRunning && imagePullSocket != null && imagePullSocket.HasIn)
-        // {
-        //     ReceiveImage();
-        // }
+        if (imageThreadRunning && imagePullSocket != null && imagePullSocket.HasIn)
+        {
+            ReceiveImage();
+        }
 
     }
 
