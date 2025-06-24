@@ -169,35 +169,6 @@ public class NetworkManager : MonoBehaviour
         debugText.text = $"[HL2][ZMQ] Connected gaze-socket to {gazeAddress}";
     }
 
-    void ImageReceiveLoop()
-    {
-        while (true)
-        {
-            try
-            {
-                var msg = imageSub.ReceiveMultipartMessage();
-                if (msg == null || msg.FrameCount != 2)
-                {
-                    Debug.LogWarning("[HL2][ZMQ] Received invalid Image, waiting for next frame...");
-                    continue;
-                }
-                currImageTime = System.BitConverter.ToSingle(msg[0].Buffer, 0);
-                debugText.text = $"[HL2][ZMQ] Received image frame with time {currImageTime}";
-
-                byte[] imageBytes = msg[1].Buffer;
-
-                Debug.Log($"[HL2][ZMQ] Received image frame with step {currImageTime}, size: {imageBytes.Length} bytes");
-
-                newImageBytes = imageBytes;
-                newImageAvailable = true;
-            }
-            catch (Exception ex)
-            {
-                Debug.LogError("[HL2][ZMQ] ImageReceiveLoop exception: " + ex.Message);
-                break;
-            }
-        }
-    }
 
     void ReceiveImage()
     {
@@ -253,6 +224,8 @@ public class NetworkManager : MonoBehaviour
         }
     }
 
+#region OLD_CODE
+
     void PublishGazeLoop()
     {
         debugText.text = "[HL2][ZMQ] Gaze publisher started, waiting for requests...";
@@ -283,6 +256,38 @@ public class NetworkManager : MonoBehaviour
             }
         }
     }
+
+        void ImageReceiveLoop()
+    {
+        while (true)
+        {
+            try
+            {
+                var msg = imageSub.ReceiveMultipartMessage();
+                if (msg == null || msg.FrameCount != 2)
+                {
+                    Debug.LogWarning("[HL2][ZMQ] Received invalid Image, waiting for next frame...");
+                    continue;
+                }
+                currImageTime = System.BitConverter.ToSingle(msg[0].Buffer, 0);
+                debugText.text = $"[HL2][ZMQ] Received image frame with time {currImageTime}";
+
+                byte[] imageBytes = msg[1].Buffer;
+
+                Debug.Log($"[HL2][ZMQ] Received image frame with step {currImageTime}, size: {imageBytes.Length} bytes");
+
+                newImageBytes = imageBytes;
+                newImageAvailable = true;
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError("[HL2][ZMQ] ImageReceiveLoop exception: " + ex.Message);
+                break;
+            }
+        }
+    }
+
+#endregion
 
     private void OnDestroy()
     {
