@@ -77,7 +77,7 @@ public class NetworkManager : MonoBehaviour
         {
             PublishGaze();
         }
-
+        debugText.text = $"[HL2][ZMQ] imageSub.HasIn: {imageSub.HasIn}";
         if (imageThreadRunning && imageSub != null && imageSub.HasIn)
         {
             ReceiveImage();
@@ -142,6 +142,7 @@ public class NetworkManager : MonoBehaviour
         //OnImageReady?.Invoke();
 
         imageSub = new SubscriberSocket();
+        imageSub.Subscribe("");
         string address = $"tcp://{pcIpAddress}:{ZMQ_IMAGE_PORT}";
         imageSub.Connect(address);
 
@@ -151,9 +152,9 @@ public class NetworkManager : MonoBehaviour
         // imageThread.Start();
 
 
-        gazeRespSocket = new ResponseSocket();
-        string gazeAddress = $"tcp://{pcIpAddress}:{ZMQ_GAZE_PORT}";
-        gazeRespSocket.Connect(gazeAddress);
+        // gazeRespSocket = new ResponseSocket();
+        // string gazeAddress = $"tcp://{pcIpAddress}:{ZMQ_GAZE_PORT}";
+        // gazeRespSocket.Connect(gazeAddress);
         // new approach
 
         gazeRespSocket = new ResponseSocket();
