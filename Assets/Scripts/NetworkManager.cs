@@ -151,14 +151,14 @@ public class NetworkManager : MonoBehaviour
         // imageThread.Start();
 
 
-        // gazeRespSocket = new ResponseSocket();
-        // string gazeAddress = $"tcp://{pcIpAddress}:{ZMQ_GAZE_PORT}";
-        // gazeRespSocket.Connect(gazeAddress);
-        // new approach
-
         gazeRespSocket = new ResponseSocket();
-        string localGazeAddress = $"tcp://*:{ZMQ_GAZE_PORT}";
-        gazeRespSocket.Bind(localGazeAddress);
+        string gazeAddress = $"tcp://{pcIpAddress}:{ZMQ_GAZE_PORT}";
+        gazeRespSocket.Connect(gazeAddress);
+
+        // // bind-approach
+        // gazeRespSocket = new ResponseSocket();
+        // string localGazeAddress = $"tcp://*:{ZMQ_GAZE_PORT}";
+        // gazeRespSocket.Bind(localGazeAddress);
 
         gazeThreadRunning = true;
         // gazeThread = new Thread(PublishGazeLoop);
