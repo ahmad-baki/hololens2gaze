@@ -23,7 +23,7 @@ public class NetworkManager : MonoBehaviour
     public static event Action OnImageReady = delegate { };
     public static event Action OnNewImage = delegate { };
 
-    public static int GAZE_PUBLISH_INTERVAL_MS = 50; // Interval to publish gaze data, in milliseconds
+    public static int GAZE_PUBLISH_TIMEOUT = 500; // Interval to publish gaze data, in milliseconds
 
     // --- UDP discovery parameters (unchanged) ---
     private const int DISCOVERY_PORT = 5005;
@@ -73,7 +73,7 @@ public class NetworkManager : MonoBehaviour
             newImageAvailable = false;
         }
 
-        if (true && gazeRespSocket != null && gazeRespSocket.HasIn)
+        if (gazeRespSocket != null)
         {
             PublishGaze();
         }
@@ -198,7 +198,14 @@ public class NetworkManager : MonoBehaviour
 
     void PublishGaze()
     {
-        var mess = gazeRespSocket.ReceiveFrameString();
+        // try to receive a gaze request with timeout, bail out if none arrives
+        if (!gazeRespSocket.TryReceiveFrameString(
+                timeout: TimeSpan.FromMilliseconds(GAZE_PUBLISH_TIMEOUT),
+                out string mess))
+        {
+            return;
+        }
+
         debugText.text = "[HL2][ZMQ] Received gaze request: " + mess;
         Vector2 gazeXY = gazeTracker.GetGazePointOnTexture();
         string gazeJson = $"{{\"x\": {gazeXY.x}, \"y\": {gazeXY.y}, \"time\": {currImageTime}}}";
