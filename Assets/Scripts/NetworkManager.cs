@@ -77,9 +77,8 @@ public class NetworkManager : MonoBehaviour
         {
             PublishGaze();
         }
-        else
-        {
-            debugText.text = $"[HL2][ZMQ] Waiting for gaze request, current timestamp: {currImageTime}, gazeRespSocket.HasIn: {gazeRespSocket.HasIn}";
+        else {
+            debugText.text = "[HL2][ZMQ] gazeRespSocket is null, waiting for connection, current time: " + Time.time;
         }
         if (imageThreadRunning && imageSub != null && imageSub.HasIn)
         {
@@ -203,6 +202,14 @@ public class NetworkManager : MonoBehaviour
                 timeout: TimeSpan.FromMilliseconds(GAZE_PUBLISH_TIMEOUT),
                 out string mess))
         {
+            debugText.text = "[HL2][ZMQ] Waiting for gaze request, current timestamp: " + Time.time;
+            // re-initialize the socket
+            gazeRespSocket?.Close();
+            gazeRespSocket = new ResponseSocket();
+            string localGazeAddress = $"tcp://*:{ZMQ_GAZE_PORT}";
+            gazeRespSocket.Bind(localGazeAddress);
+            debugText.text = "[HL2][ZMQ] Re-initialized gaze response socket" + Time.time;
+            
             return;
         }
 
