@@ -73,9 +73,13 @@ public class NetworkManager : MonoBehaviour
             newImageAvailable = false;
         }
 
-        if (gazeThreadRunning && gazeRespSocket != null && gazeRespSocket.HasIn)
+        if (true && gazeRespSocket != null && gazeRespSocket.HasIn)
         {
             PublishGaze();
+        }
+        else
+        {
+            debugText.text = $"[HL2][ZMQ] Waiting for gaze request, current timestamp: {currImageTime}, gazeRespSocket.HasIn: {gazeRespSocket.HasIn}";
         }
         if (imageThreadRunning && imageSub != null && imageSub.HasIn)
         {
@@ -180,7 +184,6 @@ public class NetworkManager : MonoBehaviour
             }
             var bytes = msg[0].Buffer;
             currImageTime = Encoding.UTF8.GetString(bytes);
-            debugText.text = $"[HL2][ZMQ] Received image frame with time {currImageTime}";
 
             byte[] imageBytes = msg[1].Buffer;
             Debug.Log($"[HL2][ZMQ] Received image frame with step {currImageTime}, size: {imageBytes.Length} bytes");
@@ -196,15 +199,18 @@ public class NetworkManager : MonoBehaviour
     void PublishGaze()
     {
         var mess = gazeRespSocket.ReceiveFrameString();
+        debugText.text = "[HL2][ZMQ] Received gaze request: " + mess;
         Vector2 gazeXY = gazeTracker.GetGazePointOnTexture();
         string gazeJson = $"{{\"x\": {gazeXY.x}, \"y\": {gazeXY.y}, \"time\": {currImageTime}}}";
         try
         {
             gazeRespSocket.SendFrame(gazeJson);
+            debugText.text = "[HL2][ZMQ] Published gaze: " + gazeJson;
         }
         catch (Exception ex)
         {
             Debug.LogError("[HL2][ZMQ] Failed to publish gaze: " + ex.Message);
+            debugText.text = "[HL2][ZMQ] Failed to publish gaze: " + ex.Message;
         }
     }
 
