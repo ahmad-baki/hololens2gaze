@@ -204,11 +204,11 @@ public class NetworkManager : MonoBehaviour
         {
             debugText.text = "[HL2][ZMQ] Waiting for gaze request, current timestamp: " + Time.time;
             // re-initialize the socket
-            gazeRespSocket?.Close();
-            gazeRespSocket = new ResponseSocket();
-            string localGazeAddress = $"tcp://*:{ZMQ_GAZE_PORT}";
-            gazeRespSocket.Bind(localGazeAddress);
-            debugText.text = "[HL2][ZMQ] Re-initialized gaze response socket" + Time.time;
+            // gazeRespSocket?.Close();
+            // gazeRespSocket = new ResponseSocket();
+            // string localGazeAddress = $"tcp://*:{ZMQ_GAZE_PORT}";
+            // gazeRespSocket.Bind(localGazeAddress);
+            // debugText.text = "[HL2][ZMQ] Re-initialized gaze response socket" + Time.time;
             
             return;
         }
