@@ -23,7 +23,7 @@ public class NetworkManager : MonoBehaviour
     public static event Action OnImageReady = delegate { };
     public static event Action OnNewImage = delegate { };
 
-    public static int GAZE_PUBLISH_TIMEOUT = 500; // Interval to publish gaze data, in milliseconds
+    public static int GAZE_PUBLISH_INTERVAL_MS = 50; // Interval to publish gaze data, in milliseconds
 
     // --- UDP discovery parameters (unchanged) ---
     private const int DISCOVERY_PORT = 5005;
@@ -73,12 +73,9 @@ public class NetworkManager : MonoBehaviour
             newImageAvailable = false;
         }
 
-        if (gazeRespSocket != null)
+        if (gazeThreadRunning && gazeRespSocket != null && gazeRespSocket.HasIn)
         {
             PublishGaze();
-        }
-        else {
-            debugText.text = "[HL2][ZMQ] gazeRespSocket is null, waiting for connection, current time: " + Time.time;
         }
         if (imageThreadRunning && imageSub != null && imageSub.HasIn)
         {
@@ -183,6 +180,7 @@ public class NetworkManager : MonoBehaviour
             }
             var bytes = msg[0].Buffer;
             currImageTime = Encoding.UTF8.GetString(bytes);
+            debugText.text = $"[HL2][ZMQ] Received image frame with time {currImageTime}";
 
             byte[] imageBytes = msg[1].Buffer;
             Debug.Log($"[HL2][ZMQ] Received image frame with step {currImageTime}, size: {imageBytes.Length} bytes");
@@ -197,34 +195,16 @@ public class NetworkManager : MonoBehaviour
 
     void PublishGaze()
     {
-        // try to receive a gaze request with timeout, bail out if none arrives
-        if (!gazeRespSocket.TryReceiveFrameString(
-                timeout: TimeSpan.FromMilliseconds(GAZE_PUBLISH_TIMEOUT),
-                out string mess))
-        {
-            debugText.text = "[HL2][ZMQ] Waiting for gaze request, current timestamp: " + Time.time;
-            // re-initialize the socket
-            // gazeRespSocket?.Close();
-            // gazeRespSocket = new ResponseSocket();
-            // string localGazeAddress = $"tcp://*:{ZMQ_GAZE_PORT}";
-            // gazeRespSocket.Bind(localGazeAddress);
-            // debugText.text = "[HL2][ZMQ] Re-initialized gaze response socket" + Time.time;
-            
-            return;
-        }
-
-        debugText.text = "[HL2][ZMQ] Received gaze request: " + mess;
+        var mess = gazeRespSocket.ReceiveFrameString();
         Vector2 gazeXY = gazeTracker.GetGazePointOnTexture();
         string gazeJson = $"{{\"x\": {gazeXY.x}, \"y\": {gazeXY.y}, \"time\": {currImageTime}}}";
         try
         {
             gazeRespSocket.SendFrame(gazeJson);
-            debugText.text = "[HL2][ZMQ] Published gaze: " + gazeJson;
         }
         catch (Exception ex)
         {
             Debug.LogError("[HL2][ZMQ] Failed to publish gaze: " + ex.Message);
-            debugText.text = "[HL2][ZMQ] Failed to publish gaze: " + ex.Message;
         }
     }
 
