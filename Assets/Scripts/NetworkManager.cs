@@ -40,8 +40,8 @@ public class NetworkManager : MonoBehaviour
     private SubscriberSocket imageSub;
     // private PublisherSocket gazePublisher;
 
-    private Thread imageThread;
-    private Thread gazeThread;
+    // private Thread imageThread;
+    // private Thread gazeThread;
     private volatile bool imageThreadRunning = false;
     private volatile bool gazeThreadRunning = false;
     private Texture2D texture;
@@ -73,14 +73,14 @@ public class NetworkManager : MonoBehaviour
             newImageAvailable = false;
         }
 
-        // if (gazeThreadRunning && gazeRespSocket != null && gazeRespSocket.HasIn)
-        // {
-        //     PublishGaze();
-        // }
-        // if (imageThreadRunning && imageSub != null && imageSub.HasIn)
-        // {
-        //     ReceiveImage();
-        // }
+        if (gazeThreadRunning && gazeRespSocket != null && gazeRespSocket.HasIn)
+        {
+            PublishGaze();
+        }
+        if (imageThreadRunning && imageSub != null && imageSub.HasIn)
+        {
+            ReceiveImage();
+        }
 
     }
 
@@ -146,24 +146,24 @@ public class NetworkManager : MonoBehaviour
         imageSub.Connect(address);
 
         imageThreadRunning = true;
-        imageThread = new Thread(ImageReceiveLoop);
-        imageThread.IsBackground = true;
-        imageThread.Start();
+        // imageThread = new Thread(ImageReceiveLoop);
+        // imageThread.IsBackground = true;
+        // imageThread.Start();
 
 
-        gazeRespSocket = new ResponseSocket();
-        string gazeAddress = $"tcp://{pcIpAddress}:{ZMQ_GAZE_PORT}";
-        gazeRespSocket.Connect(gazeAddress);
-
-        // // bind-approach
         // gazeRespSocket = new ResponseSocket();
-        // string localGazeAddress = $"tcp://*:{ZMQ_GAZE_PORT}";
-        // gazeRespSocket.Bind(localGazeAddress);
+        // string gazeAddress = $"tcp://{pcIpAddress}:{ZMQ_GAZE_PORT}";
+        // gazeRespSocket.Connect(gazeAddress);
+
+        // bind-approach
+        gazeRespSocket = new ResponseSocket();
+        string localGazeAddress = $"tcp://*:{ZMQ_GAZE_PORT}";
+        gazeRespSocket.Bind(localGazeAddress);
 
         gazeThreadRunning = true;
-        gazeThread = new Thread(PublishGazeLoop);
-        gazeThread.IsBackground = true;
-        gazeThread.Start();
+        // gazeThread = new Thread(PublishGazeLoop);
+        // gazeThread.IsBackground = true;
+        // gazeThread.Start();
     }
 
 
@@ -228,14 +228,14 @@ public class NetworkManager : MonoBehaviour
     {
         imageThreadRunning = false;
         gazeThreadRunning = false;
-        if (imageThread != null && imageThread.IsAlive)
-        {
-            imageThread.Join(500);
-        }
-        if (gazeThread != null && gazeThread.IsAlive)
-        {
-            gazeThread.Join(500);
-        }
+        // if (imageThread != null && imageThread.IsAlive)
+        // {
+        //     imageThread.Join(500);
+        // }
+        // if (gazeThread != null && gazeThread.IsAlive)
+        // {
+        //     gazeThread.Join(500);
+        // }
         imageSub?.Close();
         gazeRespSocket?.Close();
         NetMQConfig.Cleanup();
